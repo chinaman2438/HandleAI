@@ -1,0 +1,38 @@
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+
+# next.js / build
+/.next/
+/out/
+/build
+*.tsbuildinfo
+next-env.d.ts
+
+# testing
+/coverage
+
+# env files (never commit secrets)
+.env
+.env.*
+!.env.example
+
+# raw source data — NEVER commit the receivables workbook
+*.xlsx
+*.xls
+*.xlsm
+*.csv
+/import-reports/
+
+# local docs / office lock files
+PROMPT.docx
+~$*
+
+# misc
+.DS_Store
+*.pem
+npm-debug.log*
+.vercel
+.supabase/
+supabase/.temp/
