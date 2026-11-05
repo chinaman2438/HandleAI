@@ -20,7 +20,6 @@ import {
   LogOut,
   Menu,
   X,
-  ShieldCheck,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/session";
 import { logoutAction } from "@/lib/actions/portal-actions";
@@ -71,12 +70,12 @@ export function PortalShell({
     <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
       {/* Persistent Left Sidebar */}
       <aside
-        className={`fixed inset-y-0 left-0 z-40 w-64 bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform lg:static lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-40 w-64 h-screen bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         }`}
       >
         {/* Brand Header */}
-        <div className="flex items-center justify-between h-16 px-5 border-b border-slate-800">
+        <div className="flex items-center justify-between h-16 px-5 border-b border-slate-800 shrink-0">
           <div className="flex items-center gap-2.5">
             <div className="h-8 w-8 rounded-lg bg-blue-600 flex items-center justify-center font-bold text-white text-sm shadow-sm">
               M
@@ -101,7 +100,7 @@ export function PortalShell({
         </div>
 
         {/* Context Banner */}
-        <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/40">
+        <div className="px-4 py-3 border-b border-slate-800/80 bg-slate-950/40 shrink-0">
           {mode === "customer" ? (
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-wider text-blue-400">
@@ -110,21 +109,11 @@ export function PortalShell({
               <div className="text-xs font-medium text-slate-100 truncate mt-0.5">
                 {user.organizationName ?? "Assigned Group"}
               </div>
-              <div className="text-[11px] text-slate-400 mt-0.5 flex items-center gap-1">
-                <ShieldCheck className="h-3 w-3 text-emerald-400 shrink-0" />
-                <span>RLS Isolated</span>
-              </div>
             </div>
           ) : (
             <div>
               <div className="text-[10px] font-semibold uppercase tracking-wider text-amber-400">
                 Internal Workspace
-              </div>
-              <div className="text-xs font-medium text-slate-100 truncate mt-0.5">
-                All 12 Corporate Groups
-              </div>
-              <div className="text-[11px] text-slate-400 mt-0.5">
-                Role: <span className="capitalize text-slate-200">{user.role}</span>
               </div>
             </div>
           )}
@@ -158,7 +147,7 @@ export function PortalShell({
         </nav>
 
         {/* User Footer */}
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+        <div className="p-4 border-t border-slate-800 bg-slate-950/50 shrink-0">
           <div className="text-xs font-medium text-white truncate">{user.fullName}</div>
           <div className="text-[11px] text-slate-400 truncate">{user.email}</div>
           <form action={logoutAction} className="mt-3">
