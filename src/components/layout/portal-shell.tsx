@@ -23,8 +23,7 @@ import {
   ShieldCheck,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/session";
-import { loginAsDemoUserAction, logoutAction } from "@/lib/actions/portal-actions";
-import { DEMO_USERS } from "@/lib/auth/demo-users";
+import { logoutAction } from "@/lib/actions/portal-actions";
 
 interface NavItem {
   href: string;
@@ -67,34 +66,6 @@ export function PortalShell({
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
   const navItems = mode === "internal" ? INTERNAL_NAV : CUSTOMER_NAV;
-
-  const quickProfiles = [
-    {
-      id: DEMO_USERS.admin.id,
-      label: "Alex Moraes (Meridian Admin)",
-      tag: "Admin",
-    },
-    {
-      id: DEMO_USERS.employee.id,
-      label: "Bruno Tavares (Meridian Employee)",
-      tag: "Staff",
-    },
-    {
-      id: DEMO_USERS.atlantica.id,
-      label: "Grupo Atlântica (Customer)",
-      tag: "Customer",
-    },
-    {
-      id: DEMO_USERS.serraVerde.id,
-      label: "Grupo Serra Verde (Customer — JV)",
-      tag: "Customer",
-    },
-    {
-      id: DEMO_USERS.pilar.id,
-      label: "Construtora Pilar (Customer)",
-      tag: "Customer",
-    },
-  ];
 
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
@@ -233,31 +204,9 @@ export function PortalShell({
                 </span>
               </div>
               <p className="text-xs text-slate-500 hidden sm:block">
-                Currency: BRL (R$) · Timezone: America/Sao_Paulo · Latest Report Snapshot: 02/11/2026
+                Latest Report Snapshot: 02/11/2026
               </p>
             </div>
-          </div>
-
-          {/* Instant Demo Role Switcher */}
-          <div className="flex items-center gap-2">
-            <form action={loginAsDemoUserAction} className="flex items-center gap-1.5">
-              <label htmlFor="quick-switch-user" className="text-xs text-slate-500 hidden md:inline">
-                Switch Role:
-              </label>
-              <select
-                id="quick-switch-user"
-                name="userId"
-                defaultValue={user.id}
-                onChange={(e) => e.currentTarget.form?.requestSubmit()}
-                className="rounded-md border border-slate-300 bg-slate-50 px-2.5 py-1.5 text-xs font-medium text-slate-800 hover:border-slate-400 focus:border-blue-600 focus:outline-none"
-              >
-                {quickProfiles.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    [{p.tag}] {p.label}
-                  </option>
-                ))}
-              </select>
-            </form>
           </div>
         </header>
 

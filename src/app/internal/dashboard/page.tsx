@@ -9,8 +9,6 @@ import {
   TrendingUp,
   ShieldAlert,
   Upload,
-  ArrowUpRight,
-  Sparkles,
 } from "lucide-react";
 import { requireStaffUser } from "@/lib/auth/session";
 import {
@@ -49,17 +47,6 @@ export default async function InternalDashboardPage() {
     (r) => r.riskLevel === "critical" || r.riskLevel === "high"
   );
   const openDqCount = importsDq.issues.filter((i) => i.status === "open").length;
-
-  // Locate required demo scenario IDs for 1-click jump
-  const demoExtRow = receivables.find(
-    (r) => r.policyNumber === "01.18.0004471" && r.installmentNumber === 5
-  );
-  const demoDispRow = receivables.find(
-    (r) => r.policyNumber === "01.18.4183925" && r.installmentNumber === 4
-  );
-  const demoPartialRow = receivables.find(
-    (r) => r.policyNumber === "01.18.0004471" && r.installmentNumber === 6
-  );
 
   const { comparison } = wow;
 
@@ -175,89 +162,6 @@ export default async function InternalDashboardPage() {
               <div className="text-[11px] text-red-800">Held &amp; Missing</div>
             </Link>
           </div>
-        </div>
-      </div>
-
-      {/* Required Demo Walkthrough Scenarios Bar */}
-      <div className="rounded-xl bg-slate-900 text-white p-5 shadow-sm border border-slate-800">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 mb-3">
-          <div className="flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-amber-400" />
-            <h2 className="text-sm font-bold">
-              Key Operational Walkthrough Scenarios (From Workbook <code className="text-blue-300">meridian-receivables-2026-11-02.xlsx</code>)
-            </h2>
-          </div>
-          <span className="text-[11px] text-slate-400">
-            Click any scenario card to inspect or act on the live record
-          </span>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
-          {demoExtRow && (
-            <Link
-              href={`/internal/installments/${demoExtRow.id}`}
-              className="rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-blue-400 p-3.5 transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-semibold text-amber-300">
-                    SECTION 11 · EXTENSION WORKFLOW
-                  </span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
-                </div>
-                <div className="font-bold text-white mt-2">
-                  Policy 01.18.0004471 · Inst 5/10 ({formatBrl(demoExtRow.amountBrl)})
-                </div>
-                <div className="text-slate-300 mt-1">
-                  Grupo Atlântica / Atlântica Ferrovias · Aurora Seguros. Customer requested 30/11; insurer approved 15/11 (AUR-2026-118843). 2nd attempt submitted 05/11 awaiting insurer response.
-                </div>
-              </div>
-            </Link>
-          )}
-
-          {demoDispRow && (
-            <Link
-              href={`/internal/installments/${demoDispRow.id}`}
-              className="rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-blue-400 p-3.5 transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="rounded bg-blue-500/20 px-2 py-0.5 text-[10px] font-semibold text-blue-300">
-                    SECTION 15 · AMOUNT DISPUTE
-                  </span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
-                </div>
-                <div className="font-bold text-white mt-2">
-                  Policy 01.18.4183925 · Inst 4/6 ({formatBrl(demoDispRow.amountBrl)})
-                </div>
-                <div className="text-slate-300 mt-1">
-                  Grupo Atlântica / Atlântica Portos · Aurora Seguros. Disputed vs PO (R$ 4,820.00). Insurer breakdown received 06/11 showing Endorsement #1 added R$ 829.25 coverage.
-                </div>
-              </div>
-            </Link>
-          )}
-
-          {demoPartialRow && (
-            <Link
-              href={`/internal/installments/${demoPartialRow.id}`}
-              className="rounded-lg bg-slate-800/90 hover:bg-slate-800 border border-slate-700 hover:border-emerald-400 p-3.5 transition-all flex flex-col justify-between"
-            >
-              <div>
-                <div className="flex items-center justify-between">
-                  <span className="rounded bg-emerald-500/20 px-2 py-0.5 text-[10px] font-semibold text-emerald-300">
-                    SECTION 12 · PARTIAL PAYMENT &amp; RECEIPT
-                  </span>
-                  <ArrowUpRight className="h-3.5 w-3.5 text-slate-400" />
-                </div>
-                <div className="font-bold text-white mt-2">
-                  Policy 01.18.0004471 · Inst 6/10 ({formatBrl(demoPartialRow.amountBrl)})
-                </div>
-                <div className="text-slate-300 mt-1">
-                  1st partial payment of R$ 20,000.00 confirmed by Aurora Seguros (Remaining balance: R$ 21,870.55). 2nd receipt of R$ 21,870.55 under review ready to confirm!
-                </div>
-              </div>
-            </Link>
-          )}
         </div>
       </div>
 

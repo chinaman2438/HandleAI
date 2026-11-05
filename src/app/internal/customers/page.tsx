@@ -14,10 +14,7 @@ export default async function InternalCustomersPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-800 border border-indigo-200">
-            Section 4 • Corporate Groups, Joint-Venture Policyholders & Access Control
-          </span>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900">
             Customer Groups, Subsidiaries & Portal Users
           </h1>
           <p className="text-sm text-slate-600">

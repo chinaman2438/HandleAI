@@ -50,10 +50,7 @@ export default async function InternalCancellationRiskPage() {
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <span className="inline-flex items-center gap-1.5 rounded-full bg-rose-50 px-2.5 py-0.5 text-xs font-semibold text-rose-800 border border-rose-200">
-            Section 13 • Internal Early-Warning Triage
-          </span>
-          <h1 className="mt-1 text-2xl font-bold text-slate-900">
+          <h1 className="text-2xl font-bold text-slate-900">
             Cancellation-Risk Monitoring & Cancelled Policies
           </h1>
           <p className="text-sm text-slate-600">
