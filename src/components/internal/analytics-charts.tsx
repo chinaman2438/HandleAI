@@ -44,9 +44,6 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
           <h3 className="text-sm font-bold text-slate-900">
             Weekly Overdue Balance (BRL) &amp; Installment Count Trend
           </h3>
-          <p className="text-xs text-slate-500">
-            Positive overdue debt across weekly report snapshots (negative credits &amp; cancelled policies excluded).
-          </p>
         </div>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -102,9 +99,6 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
           <h3 className="text-sm font-bold text-slate-900">
             Weekly Movement: Newly Overdue vs. Resolved Paid vs. Extended
           </h3>
-          <p className="text-xs text-slate-500">
-            Answers Alex&apos;s core question (&ldquo;Are we getting better?&rdquo;) by separating true collections from extension shifts.
-          </p>
         </div>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -147,9 +141,6 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
           <h3 className="text-sm font-bold text-slate-900">
             Aging Bucket Distribution Over Time (1–30, 31–60, 61–89, 90+ Days)
           </h3>
-          <p className="text-xs text-slate-500">
-            Non-overlapping bucket boundary convention: 1–30, 31–60, 61–89, and 90+ days overdue.
-          </p>
         </div>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
@@ -178,9 +169,6 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
           <h3 className="text-sm font-bold text-slate-900">
             Overdue Aging Distribution by Corporate Group (Top 8)
           </h3>
-          <p className="text-xs text-slate-500">
-            Stacked overdue BRL exposure per customer group across non-overlapping aging buckets.
-          </p>
         </div>
         <div className="h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
