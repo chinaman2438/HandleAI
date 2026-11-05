@@ -1,8 +1,14 @@
 import pg from "pg";
+import fs from "fs";
+import path from "path";
 import { PGlite } from "@electric-sql/pglite";
 import { createMigratedPGlite, asUser } from "./pglite-harness";
 import { ensureSeededDatabase } from "../import/seed-scenarios";
 import { SqlExecutor } from "../import/sync";
+import {
+  hydrateFromRemoteSupabaseIfAvailable,
+  mirrorTablesToRemoteSupabase,
+} from "./supabase-sync";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -21,17 +27,61 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
   if (!globalThis.__meridianPgPromise) {
     globalThis.__meridianPgPromise = (async () => {
       const db = await createMigratedPGlite();
-      await ensureSeededDatabase(db);
+      const workbookPath = path.resolve(
+        process.cwd(),
+        "meridian-receivables-2026-11-02.xlsx"
+      );
+
+      // Prefer hydrating from remote Supabase when running on Vercel (or whenever remote is already seeded)
+      if (!fs.existsSync(workbookPath)) {
+        await hydrateFromRemoteSupabaseIfAvailable(db);
+      } else {
+        const hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
+        if (!hydrated) {
+          await ensureSeededDatabase(db);
+        }
+      }
       return db;
     })();
   }
   return globalThis.__meridianPgPromise;
 }
 
+function detectMutatedTables(sql: string): string[] {
+  const lower = sql.toLowerCase();
+  if (!/\b(insert|update|delete)\b/.test(lower)) return [];
+
+  const candidates = [
+    "organizations",
+    "policyholders",
+    "profiles",
+    "policies",
+    "import_batches",
+    "installments",
+    "import_rows",
+    "documents",
+    "payments",
+    "payment_allocations",
+    "payment_verifications",
+    "extensions",
+    "exceptions",
+    "exception_messages",
+    "internal_notes",
+    "installment_internal_tracking",
+    "activity_logs",
+    "installment_snapshots",
+    "data_quality_issues",
+    "reminder_settings",
+    "reminders",
+  ];
+
+  return candidates.filter((t) => lower.includes(`public.${t}`) || lower.includes(` ${t}`));
+}
+
 /**
  * Returns a SQL executor connected to either the remote Supabase PostgreSQL
- * database (when `SUPABASE_DB_URL` is set) or the embedded PostgreSQL (PGlite)
- * instance running the exact same migrations, RLS policies, and workbook data.
+ * database (when `SUPABASE_DB_URL` is set) or the PostgreSQL engine synchronized
+ * with remote Supabase via `SUPABASE_SERVICE_ROLE_KEY`.
  */
 export async function getServiceDb(): Promise<SqlExecutor> {
   const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
@@ -51,7 +101,17 @@ export async function getServiceDb(): Promise<SqlExecutor> {
     return pool;
   }
 
-  return getEmbeddedPGlite();
+  const pglite = await getEmbeddedPGlite();
+  return {
+    async query<T = Record<string, unknown>>(sql: string, params?: unknown[]) {
+      const res = await pglite.query<T>(sql, params);
+      const mutated = detectMutatedTables(sql);
+      if (mutated.length > 0) {
+        await mirrorTablesToRemoteSupabase(pglite, mutated);
+      }
+      return res;
+    },
+  };
 }
 
 /**
@@ -83,5 +143,18 @@ export async function withRlsSession<T>(
   }
 
   const pglite = await getEmbeddedPGlite();
-  return asUser(pglite, userId, async (tx) => fn(tx));
+  const mutatedSet = new Set<string>();
+  const result = await asUser(pglite, userId, async (tx) =>
+    fn({
+      async query<R = Record<string, unknown>>(sql: string, params?: unknown[]) {
+        for (const tbl of detectMutatedTables(sql)) mutatedSet.add(tbl);
+        return tx.query<R>(sql, params);
+      },
+    })
+  );
+
+  if (mutatedSet.size > 0) {
+    await mirrorTablesToRemoteSupabase(pglite, [...mutatedSet]);
+  }
+  return result;
 }
