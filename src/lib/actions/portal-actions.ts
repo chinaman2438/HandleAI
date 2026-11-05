@@ -12,6 +12,10 @@ import {
 } from "../auth/session";
 import { DEMO_USERS } from "../auth/demo-users";
 import { getServiceDb, withRlsSession } from "../db/engine";
+import {
+  mirrorBatchUploadToRemoteSupabase,
+  mirrorTablesToRemoteSupabase,
+} from "../db/supabase-sync";
 import { parseReceivablesWorkbook, normalizeGroupKey } from "../import/parser";
 import { syncWorkbookToDatabase } from "../import/sync";
 import { generateUpcomingReminders } from "../reminders/service";
@@ -1231,12 +1235,17 @@ export async function uploadExcelSpreadsheetAction(formData: FormData) {
     overrideSnapshotDate: overrideDate,
   });
 
-  const db = await getServiceDb();
-  await syncWorkbookToDatabase(db, parsed, {
+  const db = await getServiceDb({ skipMirror: true });
+  await db.query(
+    `insert into auth.users (id, email) values ($1, $2) on conflict (id) do nothing`,
+    [staff.id, staff.email]
+  );
+  const batchResult = await syncWorkbookToDatabase(db, parsed, {
     actorId: staff.id,
     actorLabel: `${staff.fullName} (Portal Upload)`,
     detectMissingRows: true,
   });
+  await mirrorBatchUploadToRemoteSupabase(db, batchResult.batchId);
 
   revalidatePath("/dashboard");
   revalidatePath("/installments");
@@ -1253,7 +1262,7 @@ export async function runRemindersAction(formData: FormData) {
   const daysOverrideRaw = formData.get("daysBeforeDue");
   const daysOverride = daysOverrideRaw ? Number(daysOverrideRaw) : undefined;
 
-  const db = await getServiceDb();
+  const db = await getServiceDb({ skipMirror: true });
   if (daysOverride && Number.isFinite(daysOverride) && daysOverride >= 1 && daysOverride <= 30) {
     await db.query(
       `update public.reminder_settings
@@ -1267,6 +1276,7 @@ export async function runRemindersAction(formData: FormData) {
     overrideDaysBeforeDue: daysOverride,
     triggeredBy: staff.id,
   });
+  await mirrorTablesToRemoteSupabase(db, ["reminder_settings", "reminders"]);
 
   revalidatePath("/internal/reminders");
   revalidatePath("/dashboard");

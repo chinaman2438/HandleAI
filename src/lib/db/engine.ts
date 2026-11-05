@@ -8,15 +8,38 @@ import { SqlExecutor } from "../import/sync";
 import {
   hydrateFromRemoteSupabaseIfAvailable,
   mirrorTablesToRemoteSupabase,
+  syncLatestBatchesFromRemoteSupabase,
 } from "./supabase-sync";
 
 declare global {
   // eslint-disable-next-line no-var
   var __meridianPgPromise: Promise<PGlite> | undefined;
   // eslint-disable-next-line no-var
+  var __meridianPgMutex: Promise<unknown> | undefined;
+  // eslint-disable-next-line no-var
   var __meridianRemotePool: pg.Pool | undefined;
   // eslint-disable-next-line no-var
   var __meridianRemoteSeeded: boolean | undefined;
+}
+
+/**
+ * Serializes access to the single-connection in-memory PGlite instance so concurrent
+ * Next.js Server Component requests (e.g., Promise.all or parallel route prefetches)
+ * never interleave transactions or `SET LOCAL role = authenticated` state.
+ */
+async function runExclusive<T>(fn: () => Promise<T>): Promise<T> {
+  const prev = globalThis.__meridianPgMutex ?? Promise.resolve();
+  let release!: () => void;
+  const next = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  globalThis.__meridianPgMutex = prev.then(() => next, () => next);
+  await prev.catch(() => {});
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
 }
 
 export function isRemotePostgresConfigured(): boolean {
@@ -32,19 +55,43 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
         "meridian-receivables-2026-11-02.xlsx"
       );
 
-      // Prefer hydrating from remote Supabase when running on Vercel (or whenever remote is already seeded)
-      if (!fs.existsSync(workbookPath)) {
-        await hydrateFromRemoteSupabaseIfAvailable(db);
-      } else {
-        const hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
-        if (!hydrated) {
-          await ensureSeededDatabase(db);
-        }
+      let hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
+      if (!hydrated) {
+        // Retry once after a short delay in case of transient cold-start network hiccup
+        await new Promise((r) => setTimeout(r, 250));
+        hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
       }
+
+      if (!hydrated && fs.existsSync(workbookPath)) {
+        await ensureSeededDatabase(db);
+      }
+
+      const checkRes = await db.query<{ cnt: number }>(
+        `select count(*)::int as cnt from public.installments`
+      );
+      if ((checkRes.rows[0]?.cnt ?? 0) === 0) {
+        // Never cache an empty database instance across future requests
+        globalThis.__meridianPgPromise = undefined;
+      }
+
       return db;
-    })();
+    })().catch((err) => {
+      globalThis.__meridianPgPromise = undefined;
+      throw err;
+    });
   }
-  return globalThis.__meridianPgPromise;
+
+  const db = await globalThis.__meridianPgPromise;
+
+  // Self-healing guard: if a previous attempt left 0 installments, re-hydrate immediately
+  const countCheck = await db.query<{ cnt: number }>(
+    `select count(*)::int as cnt from public.installments`
+  );
+  if ((countCheck.rows[0]?.cnt ?? 0) === 0) {
+    await hydrateFromRemoteSupabaseIfAvailable(db);
+  }
+
+  return db;
 }
 
 function detectMutatedTables(sql: string): string[] {
@@ -83,7 +130,9 @@ function detectMutatedTables(sql: string): string[] {
  * database (when `SUPABASE_DB_URL` is set) or the PostgreSQL engine synchronized
  * with remote Supabase via `SUPABASE_SERVICE_ROLE_KEY`.
  */
-export async function getServiceDb(): Promise<SqlExecutor> {
+export async function getServiceDb(options?: {
+  skipMirror?: boolean;
+}): Promise<SqlExecutor> {
   const dbUrl = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
   if (dbUrl) {
     if (!globalThis.__meridianRemotePool) {
@@ -102,14 +151,20 @@ export async function getServiceDb(): Promise<SqlExecutor> {
   }
 
   const pglite = await getEmbeddedPGlite();
+  const skipMirror = options?.skipMirror ?? false;
+
   return {
     async query<T = Record<string, unknown>>(sql: string, params?: unknown[]) {
-      const res = await pglite.query<T>(sql, params);
-      const mutated = detectMutatedTables(sql);
-      if (mutated.length > 0) {
-        await mirrorTablesToRemoteSupabase(pglite, mutated);
-      }
-      return res;
+      return runExclusive(async () => {
+        const res = await pglite.query<T>(sql, params);
+        if (!skipMirror) {
+          const mutated = detectMutatedTables(sql);
+          if (mutated.length > 0) {
+            await mirrorTablesToRemoteSupabase(pglite, mutated);
+          }
+        }
+        return res;
+      });
     },
   };
 }
@@ -143,18 +198,23 @@ export async function withRlsSession<T>(
   }
 
   const pglite = await getEmbeddedPGlite();
-  const mutatedSet = new Set<string>();
-  const result = await asUser(pglite, userId, async (tx) =>
-    fn({
-      async query<R = Record<string, unknown>>(sql: string, params?: unknown[]) {
-        for (const tbl of detectMutatedTables(sql)) mutatedSet.add(tbl);
-        return tx.query<R>(sql, params);
-      },
-    })
-  );
 
-  if (mutatedSet.size > 0) {
-    await mirrorTablesToRemoteSupabase(pglite, [...mutatedSet]);
-  }
-  return result;
+  return runExclusive(async () => {
+    await syncLatestBatchesFromRemoteSupabase(pglite);
+
+    const mutatedSet = new Set<string>();
+    const result = await asUser(pglite, userId, async (tx) =>
+      fn({
+        async query<R = Record<string, unknown>>(sql: string, params?: unknown[]) {
+          for (const tbl of detectMutatedTables(sql)) mutatedSet.add(tbl);
+          return tx.query<R>(sql, params);
+        },
+      })
+    );
+
+    if (mutatedSet.size > 0) {
+      await mirrorTablesToRemoteSupabase(pglite, [...mutatedSet]);
+    }
+    return result;
+  });
 }
