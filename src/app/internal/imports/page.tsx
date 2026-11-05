@@ -2,8 +2,8 @@ import Link from "next/link";
 import { FileSpreadsheet, Upload, CheckCircle2, AlertTriangle, Database, ShieldCheck } from "lucide-react";
 import { requireStaffUser } from "@/lib/auth/session";
 import { getInternalImportsAndDq } from "@/lib/data/internal-queries";
-import { uploadExcelSpreadsheetAction } from "@/lib/actions/portal-actions";
 import { formatBrDate, formatBrDateTime } from "@/lib/format";
+import { ExcelUploadForm } from "@/components/internal/excel-upload-form";
 
 export const dynamic = "force-dynamic";
 
@@ -47,42 +47,7 @@ export default async function InternalImportsPage() {
             </div>
           </div>
 
-          <form action={uploadExcelSpreadsheetAction} className="mt-4 space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Excel Workbook (.xlsx)
-              </label>
-              <input
-                type="file"
-                name="excelFile"
-                accept=".xlsx"
-                required
-                className="mt-1 block w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700"
-              />
-            </div>
-
-            <div>
-              <label className="block text-xs font-semibold text-slate-700">
-                Override Snapshot Date (Optional)
-              </label>
-              <input
-                type="date"
-                name="snapshotDate"
-                placeholder="Auto-detected from Row 2"
-                className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900"
-              />
-              <p className="mt-1 text-[11px] text-slate-500">
-                Leave blank to auto-detect from the workbook banner (e.g. <code>Snapshot: 02/11/2026</code>).
-              </p>
-            </div>
-
-            <button
-              type="submit"
-              className="w-full rounded-lg bg-slate-900 px-4 py-2.5 text-xs font-semibold text-white shadow-xs hover:bg-slate-800 cursor-pointer"
-            >
-              Run Idempotent Import & Generate Snapshot
-            </button>
-          </form>
+          <ExcelUploadForm />
         </div>
 
         <div className="lg:col-span-2 rounded-xl border border-slate-200 bg-white p-5 shadow-xs">

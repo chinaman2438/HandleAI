@@ -1255,6 +1255,8 @@ export async function uploadExcelSpreadsheetAction(formData: FormData) {
   revalidatePath("/internal/data-quality");
   revalidatePath("/internal/reports");
   revalidatePath("/internal/cancellation-risk");
+
+  return batchResult;
 }
 
 export async function runRemindersAction(formData: FormData) {

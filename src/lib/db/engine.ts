@@ -7,6 +7,7 @@ import { ensureSeededDatabase } from "../import/seed-scenarios";
 import { SqlExecutor } from "../import/sync";
 import {
   hydrateFromRemoteSupabaseIfAvailable,
+  hydrateFromBundledSeedSnapshot,
   mirrorTablesToRemoteSupabase,
   syncLatestBatchesFromRemoteSupabase,
 } from "./supabase-sync";
@@ -57,21 +58,11 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
 
       let hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
       if (!hydrated) {
-        // Retry once after a short delay in case of transient cold-start network hiccup
-        await new Promise((r) => setTimeout(r, 250));
-        hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
+        hydrated = await hydrateFromBundledSeedSnapshot(db);
       }
 
       if (!hydrated && fs.existsSync(workbookPath)) {
         await ensureSeededDatabase(db);
-      }
-
-      const checkRes = await db.query<{ cnt: number }>(
-        `select count(*)::int as cnt from public.installments`
-      );
-      if ((checkRes.rows[0]?.cnt ?? 0) === 0) {
-        // Never cache an empty database instance across future requests
-        globalThis.__meridianPgPromise = undefined;
       }
 
       return db;
@@ -83,12 +74,14 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
 
   const db = await globalThis.__meridianPgPromise;
 
-  // Self-healing guard: if a previous attempt left 0 installments, re-hydrate immediately
   const countCheck = await db.query<{ cnt: number }>(
     `select count(*)::int as cnt from public.installments`
   );
   if ((countCheck.rows[0]?.cnt ?? 0) === 0) {
-    await hydrateFromRemoteSupabaseIfAvailable(db);
+    const hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
+    if (!hydrated) {
+      await hydrateFromBundledSeedSnapshot(db);
+    }
   }
 
   return db;
