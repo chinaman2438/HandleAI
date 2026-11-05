@@ -10,6 +10,7 @@ import {
   requireCustomerUser,
   requireStaffUser,
 } from "../auth/session";
+import { DEMO_USERS } from "../auth/demo-users";
 import { getServiceDb, withRlsSession } from "../db/engine";
 import { parseReceivablesWorkbook, normalizeGroupKey } from "../import/parser";
 import { syncWorkbookToDatabase } from "../import/sync";
@@ -26,25 +27,33 @@ export async function loginAsDemoUserAction(formData: FormData) {
     redirect("/login?error=invalid_user");
   }
 
-  const db = await getServiceDb();
-  const res = await db.query<{ id: string; role: string }>(
-    `select id, role::text from public.profiles where id = $1 limit 1`,
-    [userId]
-  );
-  const profile = res.rows[0];
-  if (!profile) {
-    redirect("/login?error=user_not_found");
+  const demoMatch = Object.values(DEMO_USERS).find((u) => u.id === userId);
+  let resolvedId = demoMatch?.id ?? null;
+  let resolvedRole: string | null = demoMatch?.role ?? null;
+
+  if (!resolvedId || !resolvedRole) {
+    const db = await getServiceDb();
+    const res = await db.query<{ id: string; role: string }>(
+      `select id, role::text from public.profiles where id = $1 limit 1`,
+      [userId]
+    );
+    const profile = res.rows[0];
+    if (!profile) {
+      redirect("/login?error=user_not_found");
+    }
+    resolvedId = profile.id;
+    resolvedRole = profile.role;
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, profile.id, {
+  cookieStore.set(SESSION_COOKIE_NAME, resolvedId, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
 
-  if (profile.role === "employee" || profile.role === "admin") {
+  if (resolvedRole === "employee" || resolvedRole === "admin") {
     redirect("/internal/dashboard");
   } else {
     redirect("/dashboard");
@@ -66,26 +75,38 @@ export async function loginWithEmailAction(formData: FormData) {
     redirect("/login?error=invalid_credentials");
   }
 
-  const db = await getServiceDb();
-  const res = await db.query<{ id: string; role: string }>(
-    `select id, role::text from public.profiles where lower(email) = lower($1) limit 1`,
-    [parsed.data.email]
+  const lowerEmail = parsed.data.email.toLowerCase();
+  const demoMatch = Object.values(DEMO_USERS).find(
+    (u) => u.email.toLowerCase() === lowerEmail
   );
 
-  const profile = res.rows[0];
-  if (!profile) {
-    redirect("/login?error=invalid_credentials");
+  let resolvedId = demoMatch?.id ?? null;
+  let resolvedRole: string | null = demoMatch?.role ?? null;
+
+  if (!resolvedId || !resolvedRole) {
+    const db = await getServiceDb();
+    const res = await db.query<{ id: string; role: string }>(
+      `select id, role::text from public.profiles where lower(email) = lower($1) limit 1`,
+      [parsed.data.email]
+    );
+
+    const profile = res.rows[0];
+    if (!profile) {
+      redirect("/login?error=invalid_credentials");
+    }
+    resolvedId = profile.id;
+    resolvedRole = profile.role;
   }
 
   const cookieStore = await cookies();
-  cookieStore.set(SESSION_COOKIE_NAME, profile.id, {
+  cookieStore.set(SESSION_COOKIE_NAME, resolvedId, {
     httpOnly: true,
     sameSite: "lax",
     path: "/",
     maxAge: 60 * 60 * 24 * 7,
   });
 
-  if (profile.role === "employee" || profile.role === "admin") {
+  if (resolvedRole === "employee" || resolvedRole === "admin") {
     redirect("/internal/dashboard");
   } else {
     redirect("/dashboard");

@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { redirect } from "next/navigation";
 import { getServiceDb } from "../db/engine";
 import { createSupabaseServerClient } from "../supabase/server";
+import { DEMO_USERS } from "./demo-users";
 
 export const SESSION_COOKIE_NAME = "meridian_session_uid";
 
@@ -59,7 +60,44 @@ export async function getCurrentUser(): Promise<SessionUser | null> {
     [candidateUserId]
   );
 
-  const row = res.rows[0];
+  let row = res.rows[0];
+  if (!row) {
+    const demoUser = Object.values(DEMO_USERS).find((u) => u.id === candidateUserId);
+    if (demoUser) {
+      let orgId: string | null = null;
+      let orgName: string | null = null;
+      if (demoUser.organizationNormalized) {
+        const orgRes = await db.query<{ id: string; name: string }>(
+          `select id, name from public.organizations where normalized_name = $1 limit 1`,
+          [demoUser.organizationNormalized]
+        );
+        orgId = orgRes.rows[0]?.id ?? null;
+        orgName = orgRes.rows[0]?.name ?? null;
+      }
+      await db.query(
+        `insert into auth.users (id, email) values ($1, $2) on conflict (id) do nothing`,
+        [demoUser.id, demoUser.email]
+      );
+      await db.query(
+        `insert into public.profiles (id, organization_id, full_name, email, role)
+         values ($1, $2, $3, $4, $5::public.app_role)
+         on conflict (id) do update
+           set organization_id = coalesce(excluded.organization_id, public.profiles.organization_id),
+               full_name = excluded.full_name,
+               email = excluded.email,
+               role = excluded.role`,
+        [demoUser.id, orgId, demoUser.fullName, demoUser.email, demoUser.role]
+      );
+      row = {
+        id: demoUser.id,
+        email: demoUser.email,
+        full_name: demoUser.fullName,
+        role: demoUser.role,
+        organization_id: orgId,
+        organization_name: orgName,
+      };
+    }
+  }
   if (!row) return null;
 
   return {
