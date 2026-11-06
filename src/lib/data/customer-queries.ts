@@ -427,9 +427,17 @@ export async function getCustomerDashboardData(
 export async function getCustomerInstallmentDetail(
   user: SessionUser,
   installmentId: string,
-  referenceDate: string = DEFAULT_REFERENCE_DATE
+  referenceDate?: string
 ) {
   return withRlsSession(user.id, async (tx) => {
+    let effectiveDate = referenceDate;
+    if (!effectiveDate) {
+      const maxSnapRes = await tx.query<{ max_date: string | null }>(
+        `select max(snapshot_date)::text as max_date from public.import_batches where status = 'completed'`
+      );
+      effectiveDate = maxSnapRes.rows[0]?.max_date ?? DEFAULT_REFERENCE_DATE;
+    }
+
     const instRes = await tx.query<{
       id: string;
       policy_id: string;
@@ -456,7 +464,34 @@ export async function getCustomerInstallmentDetail(
       current_due_date: string | null;
       payment_status: string;
     }>(
-      `select * from public.customer_installments where id = $1 limit 1`,
+      `select
+         id,
+         policy_id,
+         organization_id,
+         organization_name,
+         policyholder_id,
+         policyholder_name,
+         policyholder_tax_id,
+         insurer,
+         policy_number,
+         endorsement,
+         insurance_type,
+         branch,
+         account_manager,
+         installment_number,
+         source_installment_number,
+         total_installments,
+         amount_brl::text,
+         outstanding_balance_brl::text,
+         confirmed_paid_brl::text,
+         is_credit,
+         original_due_date::text,
+         extended_due_date::text,
+         current_due_date::text,
+         payment_status::text
+       from public.customer_installments
+       where id = $1
+       limit 1`,
       [installmentId]
     );
 
@@ -568,7 +603,7 @@ export async function getCustomerInstallmentDetail(
       [installmentId]
     );
 
-    const daysFromToday = diffDaysFromReference(row.current_due_date, referenceDate);
+    const daysFromToday = diffDaysFromReference(row.current_due_date, effectiveDate);
 
     return {
       installment: {

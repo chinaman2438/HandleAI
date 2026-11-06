@@ -66,12 +66,18 @@ export function formatBrDateTime(dateInput: string | Date | null | undefined): s
  * Negative = overdue (`-daysOverdue`), Positive = days until due (`+daysUntilDue`), 0 = due today.
  */
 export function diffDaysFromReference(
-  dueDateIso: string | null | undefined,
-  referenceDateIso: string = DEFAULT_REFERENCE_DATE
+  dueDateIso: string | Date | null | undefined,
+  referenceDateIso: string | Date = DEFAULT_REFERENCE_DATE
 ): number | null {
   if (!dueDateIso) return null;
-  const dueStr = dueDateIso.slice(0, 10);
-  const refStr = referenceDateIso.slice(0, 10);
+  const dueStr =
+    dueDateIso instanceof Date
+      ? dueDateIso.toISOString().slice(0, 10)
+      : String(dueDateIso).slice(0, 10);
+  const refStr =
+    referenceDateIso instanceof Date
+      ? referenceDateIso.toISOString().slice(0, 10)
+      : String(referenceDateIso).slice(0, 10);
   const dueMs = Date.parse(`${dueStr}T00:00:00Z`);
   const refMs = Date.parse(`${refStr}T00:00:00Z`);
   if (Number.isNaN(dueMs) || Number.isNaN(refMs)) return null;
