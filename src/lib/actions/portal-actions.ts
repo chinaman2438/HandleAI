@@ -1218,13 +1218,16 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
   if (admin) {
     try {
       const nowIso = new Date().toISOString();
-      await admin.from("data_quality_issues").update({
+      const { error: dqErr } = await admin.from("data_quality_issues").update({
         status: targetDqStatus,
         resolution_notes: parsed.data.resolutionNotes,
         resolved_by: staff.id,
         resolved_at: nowIso,
         updated_at: nowIso,
       }).eq("id", parsed.data.issueId);
+      if (dqErr) {
+        console.warn("[portal-actions] Supabase data_quality_issues update warning:", dqErr.message);
+      }
 
       if (parsed.data.installmentId) {
         const instRes = await db.query<Record<string, unknown>>(
@@ -1234,10 +1237,13 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
         const iRow = instRes.rows[0];
         if (iRow) {
           const { is_credit: _omit1, import_row_id: _omit2, ...cleanedInst } = iRow;
-          await admin.from("installments").upsert({
+          const { error: instErr } = await admin.from("installments").upsert({
             ...cleanedInst,
             updated_at: nowIso,
           }, { onConflict: "id" });
+          if (instErr) {
+            console.warn("[portal-actions] Supabase installments upsert warning:", instErr.message);
+          }
 
           if (cleanedInst.policy_id) {
             const polRes = await db.query<Record<string, unknown>>(
@@ -1246,6 +1252,15 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
             );
             if (polRes.rows[0]) {
               await admin.from("policies").upsert(polRes.rows[0], { onConflict: "id" });
+              if (polRes.rows[0].policyholder_id) {
+                const phRes = await db.query<Record<string, unknown>>(
+                  `select * from public.policyholders where id = $1`,
+                  [polRes.rows[0].policyholder_id]
+                );
+                if (phRes.rows[0]) {
+                  await admin.from("policyholders").upsert(phRes.rows[0], { onConflict: "id" });
+                }
+              }
             }
           }
         }

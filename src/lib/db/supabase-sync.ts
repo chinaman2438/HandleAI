@@ -4,7 +4,7 @@ import bundledSeedSnapshot from "./seed-snapshot.json";
 
 const DEFAULT_PUBLIC_SUPABASE_URL = "https://bclondcopescvclsbsci.supabase.co";
 const DEFAULT_PUBLIC_SUPABASE_ANON_KEY =
-  "sb_publishable_bByR75p_9a_X7w6-v-c_VA_4mE8p-U8";
+  "sb_publishable_pnlhAdQ79U-on4-53xF3yA_fivT08PN";
 
 declare global {
   // eslint-disable-next-line no-var
@@ -606,8 +606,8 @@ const DELTA_TABLES: {
   { name: "reminders", tsColumn: "created_at" },
 ];
 
-// Safety margin to tolerate commit ordering / small clock skew between writers.
-const DELTA_MARGIN_MS = 2_000;
+// Safety margin to tolerate commit ordering / clock skew between writers across containers.
+const DELTA_MARGIN_MS = 60_000;
 
 declare global {
   // eslint-disable-next-line no-var
