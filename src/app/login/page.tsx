@@ -1,6 +1,6 @@
 import React from "react";
 import { redirect } from "next/navigation";
-import { ShieldCheck, Lock } from "lucide-react";
+import { Lock } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { loginWithEmailAction } from "@/lib/actions/portal-actions";
 
@@ -90,17 +90,6 @@ export default async function LoginPage({
               Sign In to Portal
             </button>
           </form>
-
-          <div className="mt-6 pt-5 border-t border-slate-200 space-y-2 text-xs text-slate-500">
-            <div className="flex items-center gap-2 font-medium text-slate-700">
-              <ShieldCheck className="h-4 w-4 text-emerald-600 shrink-0" />
-              Strict PostgreSQL Row Level Security (RLS)
-            </div>
-            <p>
-              Customer accounts only access installments filed under their own corporate group.
-              Internal notes, Checked By, and Sent to Client On are isolated to Meridian staff.
-            </p>
-          </div>
         </div>
       </div>
     </div>
