@@ -602,7 +602,7 @@ const DELTA_TABLES: {
 ];
 
 // Safety margin to tolerate commit ordering / small clock skew between writers.
-const DELTA_MARGIN_MS = 15_000;
+const DELTA_MARGIN_MS = 2_000;
 
 declare global {
   // eslint-disable-next-line no-var
