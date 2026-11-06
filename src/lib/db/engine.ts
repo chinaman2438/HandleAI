@@ -65,6 +65,10 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
         await ensureSeededDatabase(db);
       }
 
+      if (hydrated) {
+        await syncLatestBatchesFromRemoteSupabase(db);
+      }
+
       return db;
     })().catch((err) => {
       globalThis.__meridianPgPromise = undefined;
@@ -81,6 +85,9 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
     const hydrated = await hydrateFromBundledSeedSnapshot(db);
     if (!hydrated) {
       await hydrateFromRemoteSupabaseIfAvailable(db);
+    }
+    if (hydrated) {
+      await syncLatestBatchesFromRemoteSupabase(db);
     }
   }
 

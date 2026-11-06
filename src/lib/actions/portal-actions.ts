@@ -15,6 +15,8 @@ import { getServiceDb, withRlsSession } from "../db/engine";
 import {
   mirrorBatchUploadToRemoteSupabase,
   mirrorTablesToRemoteSupabase,
+  getRemoteSupabaseClient,
+  resetDeltaSyncThrottle,
 } from "../db/supabase-sync";
 import { parseReceivablesWorkbook, normalizeGroupKey } from "../import/parser";
 import { syncWorkbookToDatabase } from "../import/sync";
@@ -1194,6 +1196,8 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
     }
   }
 
+  const targetDqStatus = parsed.data.resolutionAction === "dismiss" ? "dismissed" : "resolved";
+
   await db.query(
     `update public.data_quality_issues
         set status = $2::public.dq_status,
@@ -1204,11 +1208,54 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
       where id = $1`,
     [
       parsed.data.issueId,
-      parsed.data.resolutionAction === "dismiss" ? "dismissed" : "resolved",
+      targetDqStatus,
       parsed.data.resolutionNotes,
       staff.id,
     ]
   );
+
+  const admin = await getRemoteSupabaseClient();
+  if (admin) {
+    try {
+      const nowIso = new Date().toISOString();
+      await admin.from("data_quality_issues").update({
+        status: targetDqStatus,
+        resolution_notes: parsed.data.resolutionNotes,
+        resolved_by: staff.id,
+        resolved_at: nowIso,
+        updated_at: nowIso,
+      }).eq("id", parsed.data.issueId);
+
+      if (parsed.data.installmentId) {
+        const instRes = await db.query<Record<string, unknown>>(
+          `select * from public.installments where id = $1`,
+          [parsed.data.installmentId]
+        );
+        const iRow = instRes.rows[0];
+        if (iRow) {
+          const { is_credit: _omit1, import_row_id: _omit2, ...cleanedInst } = iRow;
+          await admin.from("installments").upsert({
+            ...cleanedInst,
+            updated_at: nowIso,
+          }, { onConflict: "id" });
+
+          if (cleanedInst.policy_id) {
+            const polRes = await db.query<Record<string, unknown>>(
+              `select * from public.policies where id = $1`,
+              [cleanedInst.policy_id]
+            );
+            if (polRes.rows[0]) {
+              await admin.from("policies").upsert(polRes.rows[0], { onConflict: "id" });
+            }
+          }
+        }
+      }
+    } catch (err) {
+      console.warn("[portal-actions] Direct Supabase resolution update warning:", err);
+    }
+  }
+
+  resetDeltaSyncThrottle();
 
   revalidatePath("/dashboard");
   revalidatePath("/installments");

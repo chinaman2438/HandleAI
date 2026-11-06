@@ -391,12 +391,17 @@ export async function mirrorTablesToRemoteSupabase(
 
   for (const tableName of tableNames) {
     try {
-      const orderClause = TABLES_WITH_UPDATED_AT.has(tableName)
-        ? "order by updated_at desc nulls last limit 50"
-        : "order by created_at desc nulls last limit 50";
+      const timeCol = TABLES_WITH_UPDATED_AT.has(tableName)
+        ? "updated_at"
+        : "created_at";
 
+      // Only mirror rows modified or created in the last 30 seconds so we NEVER
+      // overwrite other records in remote Supabase with stale local baseline state.
       const res = await db.query<Record<string, unknown>>(
-        `select * from public.${tableName} ${orderClause}`
+        `select * from public.${tableName}
+          where ${timeCol} >= now() - interval '30 seconds'
+          order by ${timeCol} desc
+          limit 50`
       );
       if (res.rows.length === 0) continue;
 
@@ -637,12 +642,36 @@ async function pullRecentRowChanges(
   db: SqlExecutor,
   admin: SupabaseClient
 ): Promise<void> {
+  // For small critical workflow tables, ALWAYS fetch all rows directly from Supabase.
+  // There are only ~35 rows total across these tables. Full-sync is nearly instantaneous (<60ms)
+  // and completely eliminates watermark drift, clock skew, and cross-container stale state.
+  const CRITICAL_FULL_SYNC_TABLES = new Set([
+    "data_quality_issues",
+    "exceptions",
+    "exception_messages",
+    "payments",
+    "payment_allocations",
+    "payment_verifications",
+    "reminder_settings",
+    "risk_rules",
+  ]);
+
   const watermarks = getWatermarks();
 
   let fetched: { table: (typeof DELTA_TABLES)[number]; rows: Record<string, unknown>[] }[];
   try {
     fetched = await Promise.all(
       DELTA_TABLES.map(async (table) => {
+        if (CRITICAL_FULL_SYNC_TABLES.has(table.name)) {
+          try {
+            const rows = await fetchAllRowsFromSupabase(admin, table.name);
+            return { table, rows };
+          } catch (err) {
+            console.warn(`[supabase-sync] full fetch ${table.name} failed:`, err);
+            return { table, rows: [] };
+          }
+        }
+
         const wm = watermarks.get(table.name) ?? 0;
         const since = new Date(Math.max(0, wm - DELTA_MARGIN_MS)).toISOString();
         try {
