@@ -155,6 +155,8 @@ async function fetchAllRowsFromSupabase(
     orderBy?: string;
     eqColumn?: string;
     eqValue?: string;
+    gtColumn?: string;
+    gtValue?: string;
   }
 ): Promise<Record<string, unknown>[]> {
   const all: Record<string, unknown>[] = [];
@@ -169,6 +171,9 @@ async function fetchAllRowsFromSupabase(
       let query = admin.from(tableName).select("*");
       if (options?.eqColumn && options?.eqValue !== undefined) {
         query = query.eq(options.eqColumn, options.eqValue);
+      }
+      if (options?.gtColumn && options?.gtValue !== undefined) {
+        query = query.gt(options.gtColumn, options.gtValue);
       }
       if (options?.orderBy) {
         query = query.order(options.orderBy, { ascending: false });
@@ -357,14 +362,25 @@ export async function hydrateFromRemoteSupabaseIfAvailable(
   }
 }
 
-const TABLES_WITHOUT_CREATED_AT = new Set([
+const TABLES_WITH_UPDATED_AT = new Set([
+  "organizations",
+  "policyholders",
+  "profiles",
+  "policies",
+  "installments",
+  "exceptions",
+  "payments",
+  "extensions",
+  "data_quality_issues",
+  "risk_rules",
   "reminder_settings",
-  "installment_internal_tracking",
 ]);
 
 /**
  * Mirrors mutated tables from the local Postgres instance to remote Supabase
  * after a single-record portal mutation so the Supabase dashboard stays in sync.
+ * Rows are selected by most recent modification (updated_at when available) so
+ * updates to old rows (e.g. resolving a data-quality issue) are always mirrored.
  */
 export async function mirrorTablesToRemoteSupabase(
   db: SqlExecutor,
@@ -375,7 +391,7 @@ export async function mirrorTablesToRemoteSupabase(
 
   for (const tableName of tableNames) {
     try {
-      const orderClause = TABLES_WITHOUT_CREATED_AT.has(tableName)
+      const orderClause = TABLES_WITH_UPDATED_AT.has(tableName)
         ? "order by updated_at desc nulls last limit 50"
         : "order by created_at desc nulls last limit 50";
 
@@ -396,9 +412,14 @@ export async function mirrorTablesToRemoteSupabase(
       const conflictCol =
         tableName === "payment_allocations" ? "payment_id,installment_id" : "id";
 
-      await admin.from(tableName).upsert(cleaned, { onConflict: conflictCol });
-    } catch {
-      // Non-blocking background sync
+      const { error } = await admin
+        .from(tableName)
+        .upsert(cleaned, { onConflict: conflictCol });
+      if (error) {
+        console.warn(`[supabase-sync] mirror ${tableName} error:`, error.message);
+      }
+    } catch (err) {
+      console.warn(`[supabase-sync] mirror ${tableName} failed:`, err);
     }
   }
 }
@@ -529,20 +550,153 @@ export async function mirrorBatchUploadToRemoteSupabase(
 }
 
 /**
- * Lightweight cross-container synchronization check: if another serverless container
- * recorded a new Excel import batch in remote Supabase, pulls it and its installments/snapshots
- * into local PGlite.
+ * Cross-container synchronization: pulls (1) any Excel import batches recorded in
+ * remote Supabase by another serverless container and (2) any rows modified
+ * remotely since the last check (e.g. a data-quality issue resolved, a payment
+ * confirmed, or a note added on a different container) into local PGlite.
  */
 export async function syncLatestBatchesFromRemoteSupabase(
   db: SqlExecutor
 ): Promise<void> {
   const now = Date.now();
-  if (now - lastDeltaCheckMs < 250) return;
+  if (now - lastDeltaCheckMs < 1000) return;
   lastDeltaCheckMs = now;
 
   const admin = await getRemoteSupabaseClient();
   if (!admin) return;
 
+  await pullNewImportBatches(db, admin);
+  await pullRecentRowChanges(db, admin);
+}
+
+const DELTA_TABLES: {
+  name: string;
+  tsColumn: "updated_at" | "created_at";
+  omit?: string[];
+  conflict?: string;
+}[] = [
+  { name: "organizations", tsColumn: "updated_at" },
+  { name: "policyholders", tsColumn: "updated_at" },
+  { name: "profiles", tsColumn: "updated_at" },
+  { name: "policies", tsColumn: "updated_at" },
+  { name: "installments", tsColumn: "updated_at", omit: ["is_credit", "import_row_id"] },
+  { name: "exceptions", tsColumn: "updated_at" },
+  { name: "documents", tsColumn: "created_at" },
+  { name: "payments", tsColumn: "updated_at" },
+  {
+    name: "payment_allocations",
+    tsColumn: "created_at",
+    omit: ["id"],
+    conflict: "payment_id, installment_id",
+  },
+  { name: "payment_verifications", tsColumn: "created_at" },
+  { name: "extensions", tsColumn: "updated_at" },
+  { name: "exception_messages", tsColumn: "created_at" },
+  { name: "internal_notes", tsColumn: "created_at" },
+  { name: "installment_internal_tracking", tsColumn: "created_at" },
+  { name: "activity_logs", tsColumn: "created_at" },
+  { name: "data_quality_issues", tsColumn: "updated_at", omit: ["import_row_id"] },
+  { name: "risk_rules", tsColumn: "updated_at" },
+  { name: "reminder_settings", tsColumn: "updated_at" },
+  { name: "reminders", tsColumn: "created_at" },
+];
+
+// Safety margin to tolerate commit ordering / small clock skew between writers.
+const DELTA_MARGIN_MS = 15_000;
+
+declare global {
+  // eslint-disable-next-line no-var
+  var __meridianDeltaWatermarks: Map<string, number> | undefined;
+}
+
+function toMs(val: unknown): number {
+  if (!val) return 0;
+  const ms = Date.parse(String(val));
+  return Number.isFinite(ms) ? ms : 0;
+}
+
+function getWatermarks(): Map<string, number> {
+  if (!globalThis.__meridianDeltaWatermarks) {
+    // Initialize from the bundled snapshot (exported from remote Supabase), so a
+    // freshly hydrated container pulls every change made after the snapshot.
+    const snap = bundledSeedSnapshot as Record<string, Record<string, unknown>[]>;
+    const map = new Map<string, number>();
+    for (const t of DELTA_TABLES) {
+      let max = 0;
+      for (const row of snap[t.name] ?? []) {
+        max = Math.max(max, toMs(row[t.tsColumn]), toMs(row["created_at"]));
+      }
+      map.set(t.name, max);
+    }
+    globalThis.__meridianDeltaWatermarks = map;
+  }
+  return globalThis.__meridianDeltaWatermarks;
+}
+
+async function pullRecentRowChanges(
+  db: SqlExecutor,
+  admin: SupabaseClient
+): Promise<void> {
+  const watermarks = getWatermarks();
+
+  let fetched: { table: (typeof DELTA_TABLES)[number]; rows: Record<string, unknown>[] }[];
+  try {
+    fetched = await Promise.all(
+      DELTA_TABLES.map(async (table) => {
+        const wm = watermarks.get(table.name) ?? 0;
+        const since = new Date(Math.max(0, wm - DELTA_MARGIN_MS)).toISOString();
+        try {
+          const rows = await fetchAllRowsFromSupabase(admin, table.name, {
+            gtColumn: table.tsColumn,
+            gtValue: since,
+            orderBy: table.tsColumn,
+          });
+          return { table, rows };
+        } catch (err) {
+          console.warn(`[supabase-sync] delta fetch ${table.name} failed:`, err);
+          return { table, rows: [] };
+        }
+      })
+    );
+  } catch (err) {
+    console.warn("[supabase-sync] delta fetch failed:", err);
+    return;
+  }
+
+  for (const { table, rows } of fetched) {
+    if (rows.length === 0) continue;
+    try {
+      if (table.name === "profiles") {
+        const authTuples = rows
+          .filter((p) => p.id && p.email)
+          .map((p) => `(${sqlLiteral(p.id)}, ${sqlLiteral(p.email)})`)
+          .join(", ");
+        if (authTuples) {
+          await db.query(
+            `insert into auth.users (id, email) values ${authTuples} on conflict (id) do nothing`
+          );
+        }
+      }
+      await bulkInsertRowsIntoLocalDb(
+        db,
+        table.name,
+        rows,
+        table.omit ?? [],
+        table.conflict ?? "id"
+      );
+      let max = watermarks.get(table.name) ?? 0;
+      for (const r of rows) max = Math.max(max, toMs(r[table.tsColumn]));
+      watermarks.set(table.name, max);
+    } catch (err) {
+      console.warn(`[supabase-sync] delta apply ${table.name} failed:`, err);
+    }
+  }
+}
+
+async function pullNewImportBatches(
+  db: SqlExecutor,
+  admin: SupabaseClient
+): Promise<void> {
   try {
     const { data: remoteBatches, error } = await admin
       .from("import_batches")

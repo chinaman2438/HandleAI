@@ -4,6 +4,7 @@ import { requireStaffUser } from "@/lib/auth/session";
 import { getInternalImportsAndDq } from "@/lib/data/internal-queries";
 import { resolveDataQualityIssueAction } from "@/lib/actions/portal-actions";
 import { formatBrl, formatBrDate } from "@/lib/format";
+import { PendingSubmitButton } from "@/components/internal/pending-submit-button";
 
 export const dynamic = "force-dynamic";
 
@@ -229,12 +230,10 @@ export default async function InternalDataQualityPage() {
                     />
                   </div>
 
-                  <button
-                    type="submit"
-                    className="w-full rounded-md bg-slate-900 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-800 cursor-pointer"
-                  >
-                    Apply Resolution
-                  </button>
+                  <PendingSubmitButton
+                    label="Apply Resolution"
+                    pendingLabel="Applying Resolution..."
+                  />
                 </form>
               </div>
             </div>

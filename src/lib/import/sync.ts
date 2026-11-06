@@ -934,10 +934,19 @@ async function insertDqIssueIfNew(
   }
 ) {
   if (params.installmentId) {
+    // Row-level spreadsheet issues (swapped dates, missing policyholder, conflicting
+    // duplicates, etc.) re-appear in every weekly report. Once staff resolved or
+    // dismissed one, do NOT re-open it on the next import. "Missing from report"
+    // issues can legitimately recur, so those only dedupe against open issues.
+    const recurringCode = params.issue.code === "missing_overdue_from_report";
     const existing = await db.query<{ id: string }>(
-      `select id from public.data_quality_issues
-        where installment_id = $1 and issue_code = $2 and status = 'open'
-        limit 1`,
+      recurringCode
+        ? `select id from public.data_quality_issues
+            where installment_id = $1 and issue_code = $2 and status = 'open'
+            limit 1`
+        : `select id from public.data_quality_issues
+            where installment_id = $1 and issue_code = $2
+            limit 1`,
       [params.installmentId, params.issue.code]
     );
     if (existing.rows.length > 0) return;
