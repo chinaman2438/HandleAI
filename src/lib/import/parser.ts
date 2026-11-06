@@ -378,8 +378,11 @@ export function detectHeaderRow(ws: ExcelJS.Worksheet): {
       const text = cellToString(cell.value);
       if (!text) return;
 
-      // Check banner for "Snapshot: dd/mm/yyyy"
-      const snapMatch = /snapshot:\s*(\d{2}\/\d{2}\/\d{4}|\d{4}-\d{2}-\d{2})/i.exec(text);
+      // Check banner for "Snapshot: dd/mm/yyyy", ISO dates, or Brazilian dates
+      const snapMatch =
+        /(?:snapshot|relatorio|relatório|posicao|posição|data|semana|date|as of)?[:\s-]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{4}|\d{4}[\/\-\.]\d{1,2}[\/\-\.]\d{1,2})/i.exec(
+          text
+        );
       if (snapMatch && !snapshotDateFromBanner) {
         snapshotDateFromBanner = parseBrazilianDate(snapMatch[1]);
       }
@@ -449,11 +452,23 @@ export async function parseReceivablesWorkbook(
 
   const { headerRowNumber, columnMap, snapshotDateFromBanner } = detectHeaderRow(ws);
 
-  const fileDateMatch = /(\d{4}-\d{2}-\d{2})/.exec(fileName);
+  let fileIsoDate: string | null = null;
+  const isoMatch = /(\d{4})[-_.](\d{1,2})[-_.](\d{1,2})/.exec(fileName);
+  if (isoMatch) {
+    fileIsoDate = `${isoMatch[1]}-${isoMatch[2].padStart(2, "0")}-${isoMatch[3].padStart(2, "0")}`;
+  } else {
+    const brMatch = /(\d{1,2})[-_.](\d{1,2})[-_.](\d{4})/.exec(fileName);
+    if (brMatch) {
+      fileIsoDate = `${brMatch[3]}-${brMatch[2].padStart(2, "0")}-${brMatch[1].padStart(2, "0")}`;
+    }
+  }
+
+  // Filename date explicitly reflects the upload file identity and takes precedence over
+  // a stale copy-pasted banner in cell A2, unless the user provided a manual override.
   const snapshotDate =
-    options.overrideSnapshotDate ??
-    snapshotDateFromBanner ??
-    fileDateMatch?.[1] ??
+    options.overrideSnapshotDate ||
+    fileIsoDate ||
+    snapshotDateFromBanner ||
     new Date().toISOString().slice(0, 10);
 
   const parsedRows: NormalizedImportRow[] = [];

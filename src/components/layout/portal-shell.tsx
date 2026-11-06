@@ -23,6 +23,7 @@ import {
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/session";
 import { logoutAction } from "@/lib/actions/portal-actions";
+import { formatBrDate } from "@/lib/format";
 
 interface NavItem {
   href: string;
@@ -56,10 +57,12 @@ const INTERNAL_NAV: NavItem[] = [
 export function PortalShell({
   user,
   mode,
+  latestSnapshotDate,
   children,
 }: {
   user: SessionUser;
   mode: "customer" | "internal";
+  latestSnapshotDate?: string;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -193,7 +196,7 @@ export function PortalShell({
                 </span>
               </div>
               <p className="text-xs text-slate-500 hidden sm:block">
-                Latest Report Snapshot: 02/11/2026
+                Latest Report Snapshot: {formatBrDate(latestSnapshotDate ?? "2026-11-02")}
               </p>
             </div>
           </div>

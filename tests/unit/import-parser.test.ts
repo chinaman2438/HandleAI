@@ -106,4 +106,14 @@ describe("Excel Import Parser & Normalization Unit Tests", () => {
     expect(tpsAtlantica.length).toBe(35);
     expect(tpsSerraVerde.length).toBe(14);
   });
+
+  it("detects snapshot date from filename when uploading meridian-receivables-2026-11-09", async () => {
+    const filePath = path.resolve(process.cwd(), "meridian-receivables-2026-11-02.xlsx");
+    const buffer = fs.readFileSync(filePath);
+    const parsed = await parseReceivablesWorkbook(buffer, {
+      fileName: "meridian-receivables-2026-11-09.xlsx",
+    });
+
+    expect(parsed.snapshotDate).toBe("2026-11-09");
+  });
 });

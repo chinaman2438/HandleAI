@@ -40,7 +40,7 @@ export function ExcelUploadForm() {
           <input
             type="file"
             name="excelFile"
-            accept=".xlsx"
+            accept=".xlsx,.xls"
             required
             disabled={isPending}
             className="mt-1 block w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 disabled:opacity-60"
@@ -55,12 +55,11 @@ export function ExcelUploadForm() {
             type="date"
             name="snapshotDate"
             disabled={isPending}
-            placeholder="Auto-detected from Row 2"
+            placeholder="Auto-detected from filename or banner"
             className="mt-1 block w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-900 disabled:opacity-60"
           />
           <p className="mt-1 text-[11px] text-slate-500">
-            Leave blank to auto-detect from the workbook banner (e.g.{" "}
-            <code>Snapshot: 02/11/2026</code>).
+            Leave blank to auto-detect from filename (e.g. <code>meridian-receivables-2026-11-09</code>) or banner.
           </p>
         </div>
 

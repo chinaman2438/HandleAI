@@ -96,9 +96,17 @@ export interface CustomerDashboardData {
  */
 export async function getCustomerInstallments(
   user: SessionUser,
-  referenceDate: string = DEFAULT_REFERENCE_DATE
+  referenceDate?: string
 ): Promise<CustomerInstallmentRow[]> {
   return withRlsSession(user.id, async (tx) => {
+    let effectiveDate = referenceDate;
+    if (!effectiveDate) {
+      const maxSnapRes = await tx.query<{ max_date: string | null }>(
+        `select max(snapshot_date)::text as max_date from public.import_batches where status = 'completed'`
+      );
+      effectiveDate = maxSnapRes.rows[0]?.max_date ?? DEFAULT_REFERENCE_DATE;
+    }
+
     const res = await tx.query<{
       id: string;
       policy_id: string;
@@ -181,7 +189,7 @@ export async function getCustomerInstallments(
       const amountBrl = Number(r.amount_brl);
       const outstandingBalanceBrl = Number(r.outstanding_balance_brl);
       const confirmedPaidBrl = Number(r.confirmed_paid_brl);
-      const daysFromToday = diffDaysFromReference(r.current_due_date, referenceDate);
+      const daysFromToday = diffDaysFromReference(r.current_due_date, effectiveDate);
       const isSettledOrCancelled =
         r.payment_status === "paid" || r.payment_status === "cancelled";
 
@@ -242,9 +250,10 @@ export async function getCustomerInstallments(
  */
 export async function getCustomerDashboardData(
   user: SessionUser,
-  referenceDate: string = DEFAULT_REFERENCE_DATE
+  referenceDate?: string
 ): Promise<CustomerDashboardData> {
-  const installments = await getCustomerInstallments(user, referenceDate);
+  const effectiveRefDate = referenceDate ?? DEFAULT_REFERENCE_DATE;
+  const installments = await getCustomerInstallments(user, effectiveRefDate);
 
   const overdueInstallments = installments
     .filter((i) => i.isOverdue)
@@ -381,7 +390,7 @@ export async function getCustomerDashboardData(
   );
 
   return {
-    referenceDate,
+    referenceDate: effectiveRefDate,
     organizationName: user.organizationName ?? "Customer Group",
     kpis: {
       overdueCount: overdueInstallments.length,

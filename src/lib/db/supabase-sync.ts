@@ -327,7 +327,7 @@ export async function mirrorBatchUploadToRemoteSupabase(
     }
 
     const instRes = await db.query<Record<string, unknown>>(
-      `select * from public.installments where latest_batch_id = $1`,
+      `select * from public.installments where import_batch_id = $1`,
       [batchId]
     );
     const cleanedInst = instRes.rows.map(
@@ -337,6 +337,46 @@ export async function mirrorBatchUploadToRemoteSupabase(
       await admin
         .from("installments")
         .upsert(cleanedInst.slice(i, i + 500), { onConflict: "id" });
+    }
+
+    const snapRes = await db.query<Record<string, unknown>>(
+      `select * from public.installment_snapshots where import_batch_id = $1`,
+      [batchId]
+    );
+    if (snapRes.rows.length > 0) {
+      for (let i = 0; i < snapRes.rows.length; i += 500) {
+        await admin
+          .from("installment_snapshots")
+          .upsert(snapRes.rows.slice(i, i + 500), {
+            onConflict: "import_batch_id,installment_id",
+          });
+      }
+    }
+
+    const irRes = await db.query<Record<string, unknown>>(
+      `select * from public.import_rows where import_batch_id = $1`,
+      [batchId]
+    );
+    if (irRes.rows.length > 0) {
+      for (let i = 0; i < irRes.rows.length; i += 500) {
+        await admin
+          .from("import_rows")
+          .upsert(irRes.rows.slice(i, i + 500), {
+            onConflict: "import_batch_id,row_number",
+          });
+      }
+    }
+
+    const logRes = await db.query<Record<string, unknown>>(
+      `select * from public.activity_logs where import_batch_id = $1`,
+      [batchId]
+    );
+    if (logRes.rows.length > 0) {
+      for (let i = 0; i < logRes.rows.length; i += 500) {
+        await admin
+          .from("activity_logs")
+          .upsert(logRes.rows.slice(i, i + 500), { onConflict: "id" });
+      }
     }
 
     const dqRes = await db.query<Record<string, unknown>>(
@@ -356,7 +396,8 @@ let lastDeltaCheckMs = 0;
 
 /**
  * Lightweight cross-container synchronization check: if another serverless container
- * recorded a new Excel import batch in remote Supabase, pulls it into local PGlite.
+ * recorded a new Excel import batch in remote Supabase, pulls it and its installments/snapshots
+ * into local PGlite.
  */
 export async function syncLatestBatchesFromRemoteSupabase(
   db: SqlExecutor
@@ -369,20 +410,70 @@ export async function syncLatestBatchesFromRemoteSupabase(
   if (!admin) return;
 
   try {
-    const { data, error } = await admin
+    const { data: remoteBatches, error } = await admin
       .from("import_batches")
       .select("*")
       .order("created_at", { ascending: false })
       .limit(10);
 
-    if (error || !data || data.length === 0) return;
+    if (error || !remoteBatches || remoteBatches.length === 0) return;
 
-    const rows = (data as Record<string, unknown>[]).map(
-      ({ duplicate_of: _omit, ...rest }) => rest
+    const existingBatchesRes = await db.query<{ id: string }>(
+      `select id from public.import_batches`
     );
-    await bulkInsertRowsIntoLocalDb(db, "import_batches", rows);
-  } catch {
-    // Ignore transient network errors
+    const existingIds = new Set(existingBatchesRes.rows.map((r) => r.id));
+    const newBatches = (remoteBatches as Record<string, unknown>[]).filter(
+      (b) => b.id && !existingIds.has(String(b.id))
+    );
+
+    if (newBatches.length === 0) return;
+
+    const cleanedBatches = newBatches.map(({ duplicate_of: _omit, ...rest }) => rest);
+    await bulkInsertRowsIntoLocalDb(db, "import_batches", cleanedBatches);
+
+    for (const b of newBatches) {
+      const batchId = String(b.id);
+
+      const { data: instData } = await admin
+        .from("installments")
+        .select("*")
+        .eq("import_batch_id", batchId);
+      if (instData && instData.length > 0) {
+        await bulkInsertRowsIntoLocalDb(
+          db,
+          "installments",
+          instData as Record<string, unknown>[],
+          ["is_credit", "import_row_id"]
+        );
+      }
+
+      const { data: snapData } = await admin
+        .from("installment_snapshots")
+        .select("*")
+        .eq("import_batch_id", batchId);
+      if (snapData && snapData.length > 0) {
+        await bulkInsertRowsIntoLocalDb(
+          db,
+          "installment_snapshots",
+          snapData as Record<string, unknown>[]
+        );
+      }
+
+      const { data: dqData } = await admin
+        .from("data_quality_issues")
+        .select("*")
+        .eq("import_batch_id", batchId);
+      if (dqData && dqData.length > 0) {
+        await bulkInsertRowsIntoLocalDb(
+          db,
+          "data_quality_issues",
+          dqData as Record<string, unknown>[],
+          ["import_row_id"]
+        );
+      }
+    }
+  } catch (err) {
+    console.warn("[supabase-sync] Cross-container sync error:", err);
   }
 }
 

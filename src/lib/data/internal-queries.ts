@@ -1,5 +1,5 @@
 import "server-only";
-import { withRlsSession } from "../db/engine";
+import { getServiceDb, withRlsSession } from "../db/engine";
 import { DEFAULT_REFERENCE_DATE, diffDaysFromReference } from "../format";
 import { SessionUser } from "../auth/session";
 
@@ -136,11 +136,31 @@ export function computeHeuristicRisk(params: {
   return { level, linePriority, recommendedFollowUp };
 }
 
+export async function getLatestReportSnapshotDate(): Promise<string> {
+  try {
+    const db = await getServiceDb();
+    const res = await db.query<{ snapshot_date: string }>(
+      `select snapshot_date::text from public.import_batches where status = 'completed' order by snapshot_date desc limit 1`
+    );
+    return res.rows[0]?.snapshot_date ?? DEFAULT_REFERENCE_DATE;
+  } catch {
+    return DEFAULT_REFERENCE_DATE;
+  }
+}
+
 export async function getInternalReceivablesList(
   staffUser: SessionUser,
-  referenceDate: string = DEFAULT_REFERENCE_DATE
+  referenceDate?: string
 ): Promise<InternalReceivableRow[]> {
   return withRlsSession(staffUser.id, async (tx) => {
+    let effectiveDate = referenceDate;
+    if (!effectiveDate) {
+      const maxSnapRes = await tx.query<{ max_date: string | null }>(
+        `select max(snapshot_date)::text as max_date from public.import_batches where status = 'completed'`
+      );
+      effectiveDate = maxSnapRes.rows[0]?.max_date ?? DEFAULT_REFERENCE_DATE;
+    }
+
     const res = await tx.query<{
       id: string;
       policy_id: string;
@@ -262,7 +282,7 @@ export async function getInternalReceivablesList(
       const amountBrl = Number(r.amount_brl);
       const outstandingBalanceBrl = Number(r.outstanding_balance_brl);
       const confirmedPaidBrl = Number(r.confirmed_paid_brl);
-      const daysFromToday = diffDaysFromReference(r.current_due_date, referenceDate);
+      const daysFromToday = diffDaysFromReference(r.current_due_date, effectiveDate);
 
       const isActiveDebt =
         !r.is_credit &&
