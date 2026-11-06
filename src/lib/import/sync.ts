@@ -1,8 +1,14 @@
+import { createHash } from "crypto";
 import {
   NormalizedImportRow,
   ParsedWorkbookResult,
   parseReceivablesWorkbook,
 } from "./parser";
+
+function deterministicUuid(key: string): string {
+  const hex = createHash("sha256").update(key).digest("hex");
+  return `${hex.slice(0, 8)}-${hex.slice(8, 12)}-4${hex.slice(13, 16)}-a${hex.slice(17, 20)}-${hex.slice(20, 32)}`;
+}
 
 export interface SqlExecutor {
   query<T = Record<string, unknown>>(
@@ -171,13 +177,14 @@ export async function syncWorkbookToDatabase(
     // 1. Upsert Organization (Customer Group)
     let orgId = orgCache.get(row.groupNameNormalized);
     if (!orgId) {
+      const candidateOrgId = deterministicUuid(`org:${row.groupNameNormalized}`);
       const orgRes = await db.query<{ id: string }>(
-        `insert into public.organizations (name, normalized_name)
-         values ($1, $2)
+        `insert into public.organizations (id, name, normalized_name)
+         values ($1, $2, $3)
          on conflict (normalized_name) do update
            set updated_at = public.organizations.updated_at
          returning id`,
-        [row.groupNameDisplay, row.groupNameNormalized]
+        [candidateOrgId, row.groupNameDisplay, row.groupNameNormalized]
       );
       orgId = orgRes.rows[0].id;
       orgCache.set(row.groupNameNormalized, orgId);
@@ -195,14 +202,15 @@ export async function syncWorkbookToDatabase(
           : null) ??
         `Unverified Policyholder (${row.policyholderTaxId ?? row.policyNumber})`;
 
+      const candidatePhId = deterministicUuid(`ph:${phLookupKey}`);
       if (row.policyholderTaxIdDigits) {
         const phRes = await db.query<{ id: string }>(
-          `insert into public.policyholders (name, tax_id, tax_id_digits)
-           values ($1, $2, $3)
+          `insert into public.policyholders (id, name, tax_id, tax_id_digits)
+           values ($1, $2, $3, $4)
            on conflict (tax_id_digits) where tax_id_digits is not null do update
              set updated_at = public.policyholders.updated_at
            returning id`,
-          [fallbackName, row.policyholderTaxId, row.policyholderTaxIdDigits]
+          [candidatePhId, fallbackName, row.policyholderTaxId, row.policyholderTaxIdDigits]
         );
         policyholderId = phRes.rows[0].id;
       } else {
@@ -214,8 +222,8 @@ export async function syncWorkbookToDatabase(
           policyholderId = existingPh.rows[0].id;
         } else {
           const phRes = await db.query<{ id: string }>(
-            `insert into public.policyholders (name) values ($1) returning id`,
-            [fallbackName]
+            `insert into public.policyholders (id, name) values ($1, $2) on conflict (id) do update set updated_at = public.policyholders.updated_at returning id`,
+            [candidatePhId, fallbackName]
           );
           policyholderId = phRes.rows[0].id;
         }
@@ -227,11 +235,12 @@ export async function syncWorkbookToDatabase(
     const policyKey = `${orgId}|${row.policyNumber}|${row.endorsement}`;
     let policyId = policyCache.get(policyKey);
     if (!policyId) {
+      const candidatePolId = deterministicUuid(`pol:${policyKey}`);
       const polRes = await db.query<{ id: string }>(
         `insert into public.policies (
-          organization_id, policyholder_id, insurer, policy_number, endorsement,
+          id, organization_id, policyholder_id, insurer, policy_number, endorsement,
           insurance_type, branch, account_manager
-        ) values ($1, $2, $3, $4, $5, $6, $7, $8)
+        ) values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
         on conflict (organization_id, policy_number, endorsement) do update
           set insurer = excluded.insurer,
               insurance_type = excluded.insurance_type,
@@ -240,6 +249,7 @@ export async function syncWorkbookToDatabase(
               updated_at = now()
         returning id`,
         [
+          candidatePolId,
           orgId,
           policyholderId,
           row.insurer,
@@ -314,24 +324,28 @@ export async function syncWorkbookToDatabase(
 
       const isVisible = !isHeld;
       const dqStatus = isHeld ? "held" : "ok";
+      const candidateInstId = deterministicUuid(
+        `inst:${policyId}:${row.sourceInstallmentNumber}`
+      );
 
       const insRes = await db.query<{ id: string }>(
         `insert into public.installments (
-          policy_id, organization_id, installment_number, source_installment_number,
+          id, policy_id, organization_id, installment_number, source_installment_number,
           total_installments, amount_brl, original_due_date, extended_due_date,
           current_due_date, payment_status, source_status, outstanding_balance_brl,
           confirmed_paid_brl, is_customer_visible, data_quality_status,
           paid_source, cancellation_source, cancellation_reason, cancelled_at,
           source_row_id, import_batch_id
         ) values (
-          $1, $2, $3, $4,
-          $5, $6, $7, $8,
-          $9, $10::public.payment_status, $11, $12,
-          $13, $14, $15,
-          $16, $17, $18, $19,
-          $20, $21
+          $1, $2, $3, $4, $5,
+          $6, $7, $8, $9,
+          $10, $11::public.payment_status, $12, $13,
+          $14, $15, $16,
+          $17, $18, $19, $20,
+          $21, $22
         ) returning id`,
         [
+          candidateInstId,
           policyId,
           orgId,
           row.installmentNumber,

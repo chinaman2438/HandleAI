@@ -56,9 +56,9 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
         "meridian-receivables-2026-11-02.xlsx"
       );
 
-      let hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
+      let hydrated = await hydrateFromBundledSeedSnapshot(db);
       if (!hydrated) {
-        hydrated = await hydrateFromBundledSeedSnapshot(db);
+        hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
       }
 
       if (!hydrated && fs.existsSync(workbookPath)) {
@@ -78,9 +78,9 @@ async function getEmbeddedPGlite(): Promise<PGlite> {
     `select count(*)::int as cnt from public.installments`
   );
   if ((countCheck.rows[0]?.cnt ?? 0) === 0) {
-    const hydrated = await hydrateFromRemoteSupabaseIfAvailable(db);
+    const hydrated = await hydrateFromBundledSeedSnapshot(db);
     if (!hydrated) {
-      await hydrateFromBundledSeedSnapshot(db);
+      await hydrateFromRemoteSupabaseIfAvailable(db);
     }
   }
 
@@ -145,6 +145,10 @@ export async function getServiceDb(options?: {
 
   const pglite = await getEmbeddedPGlite();
   const skipMirror = options?.skipMirror ?? false;
+
+  await runExclusive(async () => {
+    await syncLatestBatchesFromRemoteSupabase(pglite);
+  });
 
   return {
     async query<T = Record<string, unknown>>(sql: string, params?: unknown[]) {
