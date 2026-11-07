@@ -155,17 +155,13 @@ export async function submitPaymentReceiptAction(formData: FormData) {
     file && file.size > 0
       ? file.name.replace(/[^a-zA-Z0-9._-]/g, "_")
       : `Comprovante-Pagamento-${parsed.data.paymentDate}.pdf`;
-  const mimeType =
-    file && file.size > 0 && file.type
-      ? file.type
-      : "application/pdf";
+  const rawMime = file && file.size > 0 && file.type ? file.type.toLowerCase() : "";
+  const allowedMimes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
+  const mimeType = allowedMimes.includes(rawMime) ? rawMime : "application/pdf";
   const sizeBytes = file && file.size > 0 ? file.size : 84200;
 
-  // Validate allowed file types (PDF, JPG, PNG)
-  const allowedMimes = ["application/pdf", "image/jpeg", "image/jpg", "image/png"];
-  if (file && file.size > 0 && !allowedMimes.includes(mimeType.toLowerCase())) {
-    throw new Error("Receipt must be a PDF, JPG, or PNG file.");
-  }
+  const docId = crypto.randomUUID();
+  const paymentId = crypto.randomUUID();
 
   await withRlsSession(user.id, async (tx) => {
     // Verify installment belongs to customer's organization via RLS
@@ -190,13 +186,13 @@ export async function submitPaymentReceiptAction(formData: FormData) {
     const storagePath = `org/${inst.organization_id}/receipts/${inst.id}/${Date.now()}-${fileName}`;
 
     // 1. Insert document record
-    const docRes = await tx.query<{ id: string }>(
+    await tx.query(
       `insert into public.documents (
-        installment_id, organization_id, uploaded_by, storage_path,
+        id, installment_id, organization_id, uploaded_by, storage_path,
         file_name, mime_type, size_bytes, document_type, visibility
-      ) values ($1, $2, $3, $4, $5, $6, $7, 'payment_receipt', 'customer')
-      returning id`,
+      ) values ($1, $2, $3, $4, $5, $6, $7, $8, 'payment_receipt', 'customer')`,
       [
+        docId,
         inst.id,
         inst.organization_id,
         user.id,
@@ -208,19 +204,21 @@ export async function submitPaymentReceiptAction(formData: FormData) {
     );
 
     // 2. Insert payment record with verification_status = 'submitted' (NEVER auto-confirmed!)
-    const payRes = await tx.query<{ id: string }>(
+    // Avoid `RETURNING id` because customers do not have a direct SELECT policy on `public.payments`
+    // (they read via the security-definer `public.customer_payments` view).
+    await tx.query(
       `insert into public.payments (
-        installment_id, organization_id, amount_brl, payment_date,
+        id, installment_id, organization_id, amount_brl, payment_date,
         receipt_document_id, verification_status, customer_comment,
         submitted_by, submitted_via
-      ) values ($1, $2, $3, $4::date, $5, 'submitted', $6, $7, 'customer_portal')
-      returning id`,
+      ) values ($1, $2, $3, $4, $5::date, $6, 'submitted', $7, $8, 'customer_portal')`,
       [
+        paymentId,
         inst.id,
         inst.organization_id,
         parsed.data.amountPaidBrl,
         parsed.data.paymentDate,
-        docRes.rows[0].id,
+        docId,
         parsed.data.comment ?? null,
         user.id,
       ]
@@ -237,7 +235,7 @@ export async function submitPaymentReceiptAction(formData: FormData) {
         inst.organization_id,
         `Payment receipt uploaded (${fileName}) for ${formatBrl(parsed.data.amountPaidBrl)} paid on ${formatBrDate(parsed.data.paymentDate)}.${parsed.data.comment ? ` Note: ${parsed.data.comment}` : ""}`,
         parsed.data.amountPaidBrl,
-        payRes.rows[0].id,
+        paymentId,
         user.id,
       ]
     );
@@ -265,6 +263,7 @@ export async function submitPaymentReceiptAction(formData: FormData) {
     ]
   );
 
+  resetDeltaSyncThrottle();
   revalidatePath("/dashboard");
   revalidatePath("/installments");
   revalidatePath(`/installments/${parsed.data.installmentId}`);

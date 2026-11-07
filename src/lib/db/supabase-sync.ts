@@ -410,9 +410,11 @@ export async function mirrorTablesToRemoteSupabase(
           ? res.rows.map(({ is_credit: _omit, import_row_id: _omit2, ...rest }) => rest)
           : tableName === "data_quality_issues"
             ? res.rows.map(({ import_row_id: _omit, ...rest }) => rest)
-            : tableName === "payment_allocations"
-              ? res.rows.map(({ id: _omit, ...rest }) => rest)
-              : res.rows;
+            : tableName === "documents"
+              ? res.rows.map(({ exception_id: _omit, ...rest }) => rest)
+              : tableName === "payment_allocations"
+                ? res.rows.map(({ id: _omit, ...rest }) => rest)
+                : res.rows;
 
       const conflictCol =
         tableName === "payment_allocations" ? "payment_id,installment_id" : "id";
@@ -585,8 +587,7 @@ const DELTA_TABLES: {
   { name: "profiles", tsColumn: "updated_at" },
   { name: "policies", tsColumn: "updated_at" },
   { name: "installments", tsColumn: "updated_at", omit: ["is_credit", "import_row_id"] },
-  { name: "exceptions", tsColumn: "updated_at" },
-  { name: "documents", tsColumn: "created_at" },
+  { name: "documents", tsColumn: "created_at", omit: ["exception_id"] },
   { name: "payments", tsColumn: "updated_at" },
   {
     name: "payment_allocations",
@@ -596,6 +597,7 @@ const DELTA_TABLES: {
   },
   { name: "payment_verifications", tsColumn: "created_at" },
   { name: "extensions", tsColumn: "updated_at" },
+  { name: "exceptions", tsColumn: "updated_at" },
   { name: "exception_messages", tsColumn: "created_at" },
   { name: "internal_notes", tsColumn: "created_at" },
   { name: "installment_internal_tracking", tsColumn: "created_at" },
@@ -647,6 +649,8 @@ async function pullRecentRowChanges(
   // and completely eliminates watermark drift, clock skew, and cross-container stale state.
   const CRITICAL_FULL_SYNC_TABLES = new Set([
     "data_quality_issues",
+    "documents",
+    "extensions",
     "exceptions",
     "exception_messages",
     "payments",

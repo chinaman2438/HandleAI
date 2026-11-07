@@ -122,7 +122,14 @@ function detectMutatedTables(sql: string): string[] {
     "reminders",
   ];
 
-  return candidates.filter((t) => lower.includes(`public.${t}`) || lower.includes(` ${t}`));
+  const matched = new Set(
+    candidates.filter((t) => lower.includes(`public.${t}`) || lower.includes(` ${t}`))
+  );
+  if (matched.has("payments")) {
+    matched.add("payment_allocations");
+    matched.add("installments");
+  }
+  return [...matched];
 }
 
 /**
