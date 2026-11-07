@@ -69,19 +69,19 @@ export default async function InternalImportsPage() {
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="font-bold text-slate-900">2. Group Name & Policyholder Normalization</p>
               <p className="mt-0.5 text-slate-600">
-                Normalizes casing, accents, and punctuation across Customer Groups (15 raw strings → 12 canonical organizations) while preserving Joint-Venture policyholders across groups.
+                Normalizes casing, accents, and punctuation across Customer Groups while preserving Joint-Venture policyholders across groups.
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="font-bold text-slate-900">3. Formula Errors (#REF!) & Swapped Dates</p>
               <p className="mt-0.5 text-slate-600">
-                Replaces <code>#REF!</code> in Current Due Date with <code>COALESCE(Extended, Original)</code> and logs a warning (5 rows). Holds back rows where Extended Due Date &lt; Original Due Date (10 rows).
+                Replaces <code>#REF!</code> in Current Due Date with <code>COALESCE(Extended, Original)</code> and logs a warning. Holds back rows where Extended Due Date &lt; Original Due Date.
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="font-bold text-slate-900">4. Duplicate & Historical Preservation</p>
               <p className="mt-0.5 text-slate-600">
-                Deduplicates identical rows (3 pairs), holds back conflicting duplicates (6 pairs), never overwrites portal receipts/extensions, and flags missing overdue rows for investigation.
+                Deduplicates identical rows, holds back conflicting duplicates, never overwrites portal receipts/extensions, and flags missing overdue rows for investigation.
               </p>
             </div>
           </div>
