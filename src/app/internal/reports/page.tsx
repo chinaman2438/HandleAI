@@ -173,6 +173,61 @@ export default async function InternalReportsPage({
         </div>
       </div>
 
+      {/* Aging Buckets Summary Strip */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs">
+        {agingOverall.map((b) => {
+          const theme =
+            b.bucket === "1-30"
+              ? {
+                  box: "bg-blue-50/70 border-blue-200",
+                  title: "text-blue-900",
+                  amount: "text-blue-700",
+                  sub: "text-blue-800",
+                  dot: "bg-[#3b82f6]",
+                }
+              : b.bucket === "31-60"
+                ? {
+                    box: "bg-amber-50/70 border-amber-200",
+                    title: "text-amber-900",
+                    amount: "text-amber-700",
+                    sub: "text-amber-800",
+                    dot: "bg-[#f59e0b]",
+                  }
+                : b.bucket === "61-89"
+                  ? {
+                      box: "bg-orange-50/70 border-orange-200",
+                      title: "text-orange-900",
+                      amount: "text-orange-700",
+                      sub: "text-orange-800",
+                      dot: "bg-[#f97316]",
+                    }
+                  : {
+                      box: "bg-red-50/70 border-red-200",
+                      title: "text-red-800",
+                      amount: "text-red-700",
+                      sub: "text-red-700",
+                      dot: "bg-[#dc2626]",
+                    };
+          return (
+            <div
+              key={b.bucket}
+              className={`rounded-lg border p-3.5 ${theme.box}`}
+            >
+              <div className={`font-semibold flex items-center justify-between ${theme.title}`}>
+                <span>Aging Bucket: {b.label}</span>
+                <span className={`h-2.5 w-2.5 rounded-full shrink-0 ${theme.dot}`} />
+              </div>
+              <div className={`mt-1.5 text-base font-bold tabular-nums ${theme.amount}`}>
+                {formatBrl(b.amountBrl)}
+              </div>
+              <div className={`text-[11px] mt-0.5 ${theme.sub}`}>
+                {b.count} installments · {b.percentageOfOverdueBrl}% of overdue BRL
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
       {/* Interactive Recharts Component */}
       <AnalyticsCharts data={analytics} />
 
