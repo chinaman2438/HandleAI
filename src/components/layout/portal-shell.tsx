@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import {
   LayoutDashboard,
   FileSpreadsheet,
@@ -20,10 +20,24 @@ import {
   LogOut,
   Menu,
   X,
+  Loader2,
 } from "lucide-react";
 import type { SessionUser } from "@/lib/auth/session";
 import { logoutAction } from "@/lib/actions/portal-actions";
 import { formatBrDate } from "@/lib/format";
+import { PageLoader } from "@/components/ui/page-loader";
+
+function NavigationObserver({ onRouteSettled }: { onRouteSettled: () => void }) {
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const searchKey = searchParams?.toString() ?? "";
+
+  useEffect(() => {
+    onRouteSettled();
+  }, [pathname, searchKey, onRouteSettled]);
+
+  return null;
+}
 
 interface NavItem {
   href: string;
@@ -67,10 +81,64 @@ export function PortalShell({
 }) {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [pendingHref, setPendingHref] = useState<string | null>(null);
   const navItems = mode === "internal" ? INTERNAL_NAV : CUSTOMER_NAV;
 
+  const clearPending = React.useCallback(() => {
+    setPendingHref(null);
+  }, []);
+
+  useEffect(() => {
+    setPendingHref(null);
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!pendingHref) return;
+    const timer = setTimeout(() => setPendingHref(null), 12000);
+    return () => clearTimeout(timer);
+  }, [pendingHref]);
+
+  const handleLinkClickCapture = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.ctrlKey || e.shiftKey || e.altKey) {
+      return;
+    }
+    const anchor = (e.target as HTMLElement | null)?.closest("a");
+    if (!anchor) return;
+    const rawHref = anchor.getAttribute("href");
+    if (
+      !rawHref ||
+      rawHref.startsWith("#") ||
+      rawHref.startsWith("mailto:") ||
+      rawHref.startsWith("tel:") ||
+      anchor.target === "_blank" ||
+      anchor.hasAttribute("download")
+    ) {
+      return;
+    }
+    try {
+      const targetUrl = new URL(rawHref, window.location.origin);
+      if (targetUrl.origin !== window.location.origin) return;
+      if (targetUrl.pathname.startsWith("/api/")) return;
+      const currentFull = window.location.pathname + window.location.search;
+      const targetFull = targetUrl.pathname + targetUrl.search;
+      if (targetFull !== currentFull) {
+        setPendingHref(targetUrl.pathname);
+        setMobileOpen(false);
+      }
+    } catch {
+      // Ignore malformed URLs
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50 flex flex-col lg:flex-row">
+    <div
+      onClickCapture={handleLinkClickCapture}
+      className="min-h-screen bg-slate-50 flex flex-col lg:flex-row"
+    >
+      <Suspense fallback={null}>
+        <NavigationObserver onRouteSettled={clearPending} />
+      </Suspense>
+
       {/* Persistent Left Sidebar */}
       <aside
         className={`fixed inset-y-0 left-0 z-40 w-64 h-screen bg-slate-900 text-slate-100 flex flex-col border-r border-slate-800 transition-transform lg:sticky lg:top-0 lg:h-screen lg:shrink-0 lg:translate-x-0 ${
@@ -126,11 +194,18 @@ export function PortalShell({
         <nav className="flex-1 overflow-y-auto px-3 py-4 space-y-1">
           {navItems.map((item) => {
             const Icon = item.icon;
+            const targetPath = pendingHref ?? pathname;
             const active =
-              pathname === item.href ||
+              targetPath === item.href ||
               (item.href !== "/dashboard" &&
                 item.href !== "/internal/dashboard" &&
-                pathname.startsWith(item.href));
+                targetPath.startsWith(item.href));
+            const isItemLoading =
+              pendingHref !== null &&
+              (pendingHref === item.href ||
+                (item.href !== "/dashboard" &&
+                  item.href !== "/internal/dashboard" &&
+                  pendingHref.startsWith(item.href)));
             return (
               <Link
                 key={item.href}
@@ -142,7 +217,11 @@ export function PortalShell({
                     : "text-slate-300 hover:bg-slate-800/80 hover:text-white"
                 }`}
               >
-                <Icon className="h-4 w-4 shrink-0" />
+                {isItemLoading ? (
+                  <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+                ) : (
+                  <Icon className="h-4 w-4 shrink-0" />
+                )}
                 <span className="truncate">{item.label}</span>
               </Link>
             );
@@ -168,7 +247,7 @@ export function PortalShell({
       {/* Main Content Area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar */}
-        <header className="sticky top-0 z-30 h-16 bg-white border-b border-slate-200 px-4 lg:px-8 flex items-center justify-between gap-4">
+        <header className="relative sticky top-0 z-30 h-16 bg-white border-b border-slate-200 px-4 lg:px-8 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               type="button"
@@ -200,11 +279,16 @@ export function PortalShell({
               </p>
             </div>
           </div>
+          {pendingHref && (
+            <div className="absolute bottom-0 inset-x-0 h-0.5 bg-blue-100 overflow-hidden">
+              <div className="h-full w-full bg-blue-600 animate-pulse" />
+            </div>
+          )}
         </header>
 
         {/* Page Body */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
-          {children}
+        <main className="relative flex-1 p-4 sm:p-6 lg:p-8 max-w-[1600px] w-full mx-auto">
+          {pendingHref ? <PageLoader /> : children}
         </main>
       </div>
     </div>
