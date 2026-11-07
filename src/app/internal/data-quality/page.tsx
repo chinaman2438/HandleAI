@@ -39,9 +39,6 @@ export default async function InternalDataQualityPage() {
             <EyeOff className="h-4 w-4 text-rose-600" />
           </div>
           <p className="mt-2 text-2xl font-bold text-rose-950">{openHeld.length} issues</p>
-          <p className="mt-1 text-xs text-rose-800">
-            <code>is_customer_visible = false</code> until staff resolution
-          </p>
         </div>
 
         <div className="rounded-xl border border-amber-200 bg-amber-50/60 p-4 shadow-xs">
@@ -52,9 +49,6 @@ export default async function InternalDataQualityPage() {
             <AlertTriangle className="h-4 w-4 text-amber-600" />
           </div>
           <p className="mt-2 text-2xl font-bold text-amber-950">{openWarnings.length} warnings</p>
-          <p className="mt-1 text-xs text-amber-800">
-            Includes <code>#REF!</code> fallbacks, Installment 0→1/1, and exact deduplications
-          </p>
         </div>
 
         <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-xs">
@@ -65,9 +59,6 @@ export default async function InternalDataQualityPage() {
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
           </div>
           <p className="mt-2 text-2xl font-bold text-emerald-950">{resolvedIssues.length}</p>
-          <p className="mt-1 text-xs text-emerald-800">
-            Audited and logged in <code>public.data_quality_issues</code>
-          </p>
         </div>
       </div>
 
