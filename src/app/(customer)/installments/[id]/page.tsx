@@ -32,6 +32,7 @@ import {
   ExceptionStatusBadge,
 } from "@/components/ui/badges";
 import { PendingSubmitButton } from "@/components/internal/pending-submit-button";
+import { FileInput } from "@/components/ui/file-input";
 
 export default async function CustomerInstallmentDetailPage({
   params,
@@ -599,11 +600,9 @@ export default async function CustomerInstallmentDetailPage({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Receipt Document (PDF, JPG, PNG)
                 </label>
-                <input
-                  type="file"
+                <FileInput
                   name="receiptFile"
                   accept=".pdf,.jpg,.jpeg,.png,application/pdf,image/jpeg,image/png"
-                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
                 />
               </div>
 
@@ -722,11 +721,9 @@ export default async function CustomerInstallmentDetailPage({
                 <label className="block text-xs font-semibold text-slate-700 mb-1">
                   Supporting Document (Optional PO / Calculation PDF)
                 </label>
-                <input
-                  type="file"
+                <FileInput
                   name="supportFile"
                   accept=".pdf,.jpg,.jpeg,.png"
-                  className="w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-1.5 text-xs text-slate-700"
                 />
               </div>
 

@@ -6,6 +6,7 @@ import { CheckCircle2, Loader2, AlertCircle } from "lucide-react";
 import { uploadExcelSpreadsheetAction } from "@/lib/actions/portal-actions";
 import type { SyncBatchResult } from "@/lib/import/sync";
 import { formatBrDate } from "@/lib/format";
+import { FileInput } from "@/components/ui/file-input";
 
 export function ExcelUploadForm() {
   const router = useRouter();
@@ -37,13 +38,13 @@ export function ExcelUploadForm() {
           <label className="block text-xs font-semibold text-slate-700">
             Excel Workbook (.xlsx)
           </label>
-          <input
-            type="file"
+          <FileInput
             name="excelFile"
             accept=".xlsx,.xls"
             required
             disabled={isPending}
-            className="mt-1 block w-full rounded-lg border border-slate-300 bg-slate-50 px-3 py-2 text-xs text-slate-700 file:mr-3 file:rounded-md file:border-0 file:bg-blue-600 file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700 disabled:opacity-60"
+            buttonVariant="primary"
+            className="mt-1 py-2"
           />
         </div>
 

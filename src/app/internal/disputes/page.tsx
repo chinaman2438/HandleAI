@@ -6,6 +6,7 @@ import { getInternalDisputesQueue } from "@/lib/data/internal-queries";
 import { resolveAmountDisputeAction } from "@/lib/actions/portal-actions";
 import { formatBrl, formatBrDate } from "@/lib/format";
 import { ExceptionStatusBadge } from "@/components/ui/badges";
+import { FileInput } from "@/components/ui/file-input";
 
 export default async function InternalDisputesPage() {
   const staff = await requireStaffUser();
@@ -118,11 +119,10 @@ export default async function InternalDisputesPage() {
                   <label className="block text-[11px] font-semibold text-slate-700 mb-0.5">
                     Attach Breakdown PDF
                   </label>
-                  <input
-                    type="file"
+                  <FileInput
                     name="breakdownFile"
                     accept=".pdf,.jpg,.png"
-                    className="w-full rounded border border-slate-300 bg-white px-2 py-1 text-xs"
+                    className="bg-white py-1"
                   />
                 </div>
               </div>
