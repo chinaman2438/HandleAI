@@ -7,10 +7,12 @@ export function PendingSubmitButton({
   label,
   pendingLabel,
   className,
+  icon,
 }: {
   label: string;
   pendingLabel: string;
   className?: string;
+  icon?: React.ReactNode;
 }) {
   const { pending } = useFormStatus();
 
@@ -30,7 +32,10 @@ export function PendingSubmitButton({
           {pendingLabel}
         </>
       ) : (
-        label
+        <>
+          {icon}
+          {label}
+        </>
       )}
     </button>
   );

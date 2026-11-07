@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { Lock } from "lucide-react";
 import { getCurrentUser } from "@/lib/auth/session";
 import { loginWithEmailAction } from "@/lib/actions/portal-actions";
+import { PendingSubmitButton } from "@/components/internal/pending-submit-button";
 
 export default async function LoginPage({
   searchParams,
@@ -80,13 +81,12 @@ export default async function LoginPage({
               />
             </div>
 
-            <button
-              type="submit"
-              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 transition-colors cursor-pointer"
-            >
-              <Lock className="h-4 w-4" />
-              Sign In to Portal
-            </button>
+            <PendingSubmitButton
+              icon={<Lock className="h-4 w-4" />}
+              label="Sign In to Portal"
+              pendingLabel="Signing In to Portal..."
+              className="w-full inline-flex items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-75 transition-colors cursor-pointer"
+            />
           </form>
         </div>
       </div>
