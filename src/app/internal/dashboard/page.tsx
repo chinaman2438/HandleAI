@@ -58,10 +58,6 @@ export default async function InternalDashboardPage() {
           <h1 className="text-xl font-bold text-slate-900">
             Meridian Receivables Management Overview
           </h1>
-          <p className="text-xs text-slate-600 mt-0.5">
-            Portfolio-wide operational control center for Alex Moraes &amp; the receivables team ·{" "}
-            {receivables.length} tracked installments across 12 corporate groups.
-          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <Link
