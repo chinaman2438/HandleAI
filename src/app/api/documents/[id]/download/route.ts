@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCurrentUser } from "@/lib/auth/session";
 import { withRlsSession } from "@/lib/db/engine";
+import { downloadDocumentBlob } from "@/lib/db/supabase-sync";
 import { formatBrl, formatBrDate } from "@/lib/format";
 
 function buildSimplePdfBuffer(lines: string[]): Buffer {
@@ -104,6 +105,19 @@ export async function GET(
       { error: "Document not found or access denied by Row Level Security" },
       { status: 404 }
     );
+  }
+
+  const storedBlob = await downloadDocumentBlob(doc.storage_path);
+  if (storedBlob) {
+    const contentType = doc.mime_type || storedBlob.mimeType || "application/pdf";
+    return new NextResponse(new Uint8Array(storedBlob.buffer), {
+      status: 200,
+      headers: {
+        "Content-Type": contentType,
+        "Content-Disposition": `inline; filename="${doc.file_name}"`,
+        "Cache-Control": "private, no-store",
+      },
+    });
   }
 
   const pdfBuffer = buildSimplePdfBuffer([

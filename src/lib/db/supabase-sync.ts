@@ -9,6 +9,10 @@ const DEFAULT_PUBLIC_SUPABASE_ANON_KEY =
 declare global {
   // eslint-disable-next-line no-var
   var __meridianSupabaseClientPromise: Promise<SupabaseClient | null> | undefined;
+  // eslint-disable-next-line no-var
+  var __meridianDocumentBuffers:
+    | Map<string, { buffer: Buffer; mimeType: string }>
+    | undefined;
 }
 
 function cleanEnvValue(val: string | undefined): string {
@@ -141,6 +145,74 @@ export async function getRemoteSupabaseClient(): Promise<SupabaseClient | null> 
     globalThis.__meridianSupabaseClientPromise = undefined;
   }
   return client;
+}
+
+function getDocumentBufferCache(): Map<string, { buffer: Buffer; mimeType: string }> {
+  if (!globalThis.__meridianDocumentBuffers) {
+    globalThis.__meridianDocumentBuffers = new Map();
+  }
+  return globalThis.__meridianDocumentBuffers;
+}
+
+/**
+ * Persists an uploaded document binary to both the local in-memory cache and
+ * the remote Supabase `documents` Storage bucket so any serverless container
+ * can serve the exact file uploaded by the user.
+ */
+export async function uploadDocumentBlob(
+  storagePath: string,
+  buffer: Buffer,
+  mimeType: string
+): Promise<void> {
+  getDocumentBufferCache().set(storagePath, { buffer, mimeType });
+
+  const client = await getRemoteSupabaseClient();
+  if (!client) return;
+
+  try {
+    const { error } = await client.storage.from("documents").upload(storagePath, buffer, {
+      contentType: mimeType || "application/pdf",
+      upsert: true,
+    });
+    if (error) {
+      console.warn("[supabase-sync] Storage upload warning:", error.message);
+    }
+  } catch (err) {
+    console.warn("[supabase-sync] Storage upload failed:", err);
+  }
+}
+
+/**
+ * Retrieves an uploaded document binary from the local cache or remote Supabase
+ * `documents` Storage bucket. Returns null if the document is a seeded placeholder.
+ */
+export async function downloadDocumentBlob(
+  storagePath: string
+): Promise<{ buffer: Buffer; mimeType?: string } | null> {
+  const cached = getDocumentBufferCache().get(storagePath);
+  if (cached) {
+    return cached;
+  }
+
+  const client = await getRemoteSupabaseClient();
+  if (!client) return null;
+
+  try {
+    const { data, error } = await client.storage.from("documents").download(storagePath);
+    if (error || !data) {
+      return null;
+    }
+    const arrayBuffer = await data.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+    const mimeType = data.type || undefined;
+    getDocumentBufferCache().set(storagePath, {
+      buffer,
+      mimeType: mimeType ?? "application/pdf",
+    });
+    return { buffer, mimeType };
+  } catch {
+    return null;
+  }
 }
 
 async function sleep(ms: number) {

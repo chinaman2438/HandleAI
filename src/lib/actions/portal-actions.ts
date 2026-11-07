@@ -17,6 +17,7 @@ import {
   mirrorTablesToRemoteSupabase,
   getRemoteSupabaseClient,
   resetDeltaSyncThrottle,
+  uploadDocumentBlob,
 } from "../db/supabase-sync";
 import { parseReceivablesWorkbook, normalizeGroupKey } from "../import/parser";
 import { syncWorkbookToDatabase } from "../import/sync";
@@ -162,6 +163,9 @@ export async function submitPaymentReceiptAction(formData: FormData) {
 
   const docId = crypto.randomUUID();
   const paymentId = crypto.randomUUID();
+  const uploadedBuffer =
+    file && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : null;
+  let savedStoragePath: string | null = null;
 
   await withRlsSession(user.id, async (tx) => {
     // Verify installment belongs to customer's organization via RLS
@@ -184,6 +188,7 @@ export async function submitPaymentReceiptAction(formData: FormData) {
     }
 
     const storagePath = `org/${inst.organization_id}/receipts/${inst.id}/${Date.now()}-${fileName}`;
+    savedStoragePath = storagePath;
 
     // 1. Insert document record
     await tx.query(
@@ -240,6 +245,10 @@ export async function submitPaymentReceiptAction(formData: FormData) {
       ]
     );
   });
+
+  if (uploadedBuffer && savedStoragePath) {
+    await uploadDocumentBlob(savedStoragePath, uploadedBuffer, mimeType);
+  }
 
   // Log activity in service context (since activity_logs write policy is staff/service)
   const sdb = await getServiceDb();
@@ -410,6 +419,10 @@ export async function submitAmountDisputeAction(formData: FormData) {
   }
 
   const file = formData.get("supportFile") as File | null;
+  const disputeFileBuffer =
+    file && file.size > 0 ? Buffer.from(await file.arrayBuffer()) : null;
+  let disputeStoragePath: string | null = null;
+  const disputeMimeType = (file && file.type) || "application/pdf";
 
   await withRlsSession(user.id, async (tx) => {
     const instRes = await tx.query<{
@@ -446,6 +459,7 @@ export async function submitAmountDisputeAction(formData: FormData) {
     if (file && file.size > 0) {
       const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, "_");
       const storagePath = `org/${inst.organization_id}/disputes/${excRes.rows[0].id}/${Date.now()}-${safeName}`;
+      disputeStoragePath = storagePath;
       await tx.query(
         `insert into public.documents (
           installment_id, exception_id, organization_id, uploaded_by,
@@ -458,12 +472,16 @@ export async function submitAmountDisputeAction(formData: FormData) {
           user.id,
           storagePath,
           safeName,
-          file.type || "application/pdf",
+          disputeMimeType,
           file.size,
         ]
       );
     }
   });
+
+  if (disputeFileBuffer && disputeStoragePath) {
+    await uploadDocumentBlob(disputeStoragePath, disputeFileBuffer, disputeMimeType);
+  }
 
   const sdb = await getServiceDb();
   await sdb.query(
@@ -964,6 +982,8 @@ export async function resolveAmountDisputeAction(formData: FormData) {
   if (breakdownFile && breakdownFile.size > 0) {
     const safeName = breakdownFile.name.replace(/[^a-zA-Z0-9._-]/g, "_");
     const storagePath = `org/${orgId}/disputes/${parsed.data.exceptionId}/${Date.now()}-${safeName}`;
+    const breakdownMime = breakdownFile.type || "application/pdf";
+    const breakdownBuffer = Buffer.from(await breakdownFile.arrayBuffer());
     await db.query(
       `insert into public.documents (
         installment_id, exception_id, organization_id, uploaded_by,
@@ -976,10 +996,11 @@ export async function resolveAmountDisputeAction(formData: FormData) {
         staff.id,
         storagePath,
         safeName,
-        breakdownFile.type || "application/pdf",
+        breakdownMime,
         breakdownFile.size,
       ]
     );
+    await uploadDocumentBlob(storagePath, breakdownBuffer, breakdownMime);
   }
 
   await db.query(
