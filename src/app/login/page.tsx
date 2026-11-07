@@ -59,7 +59,6 @@ export default async function LoginPage({
                 name="email"
                 type="email"
                 required
-                defaultValue="admin@meridian.demo"
                 placeholder="name@company.com.br"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
               />
@@ -77,7 +76,6 @@ export default async function LoginPage({
                 name="password"
                 type="password"
                 required
-                defaultValue="Meridian2026!"
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 focus:border-blue-600 focus:outline-none"
               />
             </div>
