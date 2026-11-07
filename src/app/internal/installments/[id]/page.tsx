@@ -247,9 +247,6 @@ export default async function InternalInstallmentDetailPage({
                   Confidential Internal Notes &amp; Spreadsheet Tracking
                 </h2>
               </div>
-              <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 ring-1 ring-inset ring-amber-400/30">
-                INTERNAL ONLY — NEVER EXPOSED TO CUSTOMERS
-              </span>
             </div>
 
             {/* Checked By & Sent to Client On History */}
