@@ -378,11 +378,10 @@ export function InternalReceivablesTable({
                     />
                   </td>
                   <td className="py-2.5 px-2 text-center tabular-nums">
-                    <div className="inline-flex items-center gap-1">
+                    <div className="inline-flex items-center justify-center gap-1">
                       <span className="font-semibold text-slate-900">
                         {r.extensionAttempts}
                       </span>
-                      <span className="text-slate-400">({r.approvedExtensions} ok)</span>
                       {r.extensionAttempts >= 2 && (
                         <span title="2+ extensions — insurer reluctance warning">
                           <AlertTriangle className="h-3.5 w-3.5 text-amber-600" />
