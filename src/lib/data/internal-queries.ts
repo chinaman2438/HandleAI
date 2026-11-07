@@ -361,6 +361,14 @@ export async function getInternalReceivablesList(
         latestCheckedBy: r.latest_checked_by,
         latestSentToClientOn: r.latest_sent_on,
       };
+    }).filter((r) => {
+      if (
+        (r.isMissingFromLatest || r.paymentStatus === "missing_from_latest_report") &&
+        r.daysOverdue <= 0
+      ) {
+        return false;
+      }
+      return true;
     });
   });
 }

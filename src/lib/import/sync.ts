@@ -746,9 +746,20 @@ export async function syncWorkbookToDatabase(
       );
       const isOverdue = daysOverdue > 0 && outBrl > 0;
 
-      if (isOverdue) {
-        missingOverdueRows++;
+      if (!isOverdue) {
+        await db.query(
+          `update public.installments
+              set is_missing_from_latest = true,
+                  is_customer_visible = false,
+                  missing_since = coalesce(missing_since, $2::date),
+                  updated_at = now()
+            where id = $1`,
+          [inst.id, parsed.snapshotDate]
+        );
+        continue;
       }
+
+      missingOverdueRows++;
 
       if (!inst.is_missing_from_latest) {
         await db.query(
@@ -779,12 +790,10 @@ export async function syncWorkbookToDatabase(
             JSON.stringify({
               paymentStatus: "missing_from_latest_report",
               snapshotDate: parsed.snapshotDate,
-              wasOverdue: isOverdue,
+              wasOverdue: true,
               daysOverdue,
             }),
-            isOverdue
-              ? `HIGH PRIORITY: Overdue installment (${daysOverdue}d overdue, R$ ${outBrl.toFixed(2)}) disappeared from ${parsed.fileName} without Paid or Cancelled status.`
-              : `Upcoming installment disappeared from ${parsed.fileName}.`,
+            `HIGH PRIORITY: Overdue installment (${daysOverdue}d overdue, R$ ${outBrl.toFixed(2)}) disappeared from ${parsed.fileName} without Paid or Cancelled status.`,
             batchId,
           ]
         );
@@ -797,14 +806,10 @@ export async function syncWorkbookToDatabase(
           rowNumber: null,
           issue: {
             code: "missing_overdue_from_report" as never,
-            severity: isOverdue ? "high" : "info",
+            severity: "high",
             holdsVisibility: false,
-            title: isOverdue
-              ? `Overdue installment missing from latest report (${daysOverdue} days overdue)`
-              : "Upcoming installment missing from latest report",
-            description: isOverdue
-              ? `Installment ${inst.installment_number}/${inst.total_installments} (R$ ${outBrl.toFixed(2)}, due ${inst.current_due_date}) was overdue and disappeared from ${parsed.fileName}. Do not assume Paid or Cancelled — investigate with insurer.`
-              : `Upcoming installment ${inst.installment_number}/${inst.total_installments} (due ${inst.current_due_date}) was not present in ${parsed.fileName}.`,
+            title: `Overdue installment missing from latest report (${daysOverdue} days overdue)`,
+            description: `Installment ${inst.installment_number}/${inst.total_installments} (R$ ${outBrl.toFixed(2)}, due ${inst.current_due_date}) was overdue and disappeared from ${parsed.fileName}. Do not assume Paid or Cancelled — investigate with insurer.`,
           },
           raw: { snapshotDate: parsed.snapshotDate, previousStatus: inst.payment_status },
         });
