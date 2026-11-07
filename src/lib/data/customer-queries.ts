@@ -182,6 +182,7 @@ export async function getCustomerInstallments(
           and ex.type = 'amount_dispute'
           and ex.status not in ('resolved', 'rejected')
       ) disp on true
+      where coalesce(ci.payment_status::text, '') != 'missing_from_latest_report'
       order by ci.current_due_date asc nulls last, ci.policy_number asc, ci.installment_number asc
     `);
 
@@ -490,7 +491,7 @@ export async function getCustomerInstallmentDetail(
          current_due_date::text,
          payment_status::text
        from public.customer_installments
-       where id = $1
+       where id = $1 and coalesce(payment_status::text, '') != 'missing_from_latest_report'
        limit 1`,
       [installmentId]
     );

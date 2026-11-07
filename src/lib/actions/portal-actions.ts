@@ -1153,6 +1153,7 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
                   confirmed_paid_brl = greatest(confirmed_paid_brl, amount_brl),
                   outstanding_balance_brl = 0,
                   is_missing_from_latest = false,
+                  is_customer_visible = true,
                   updated_at = now()
             where id = $1`,
           [inst.id]
@@ -1165,6 +1166,8 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
                   cancellation_source = 'Employee investigation',
                   cancellation_reason = $2,
                   cancelled_at = now(),
+                  is_missing_from_latest = false,
+                  is_customer_visible = false,
                   updated_at = now()
             where id = $1`,
           [inst.id, parsed.data.resolutionNotes]
@@ -1174,6 +1177,7 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
           `update public.installments
               set payment_status = 'open',
                   is_missing_from_latest = false,
+                  is_customer_visible = true,
                   updated_at = now()
             where id = $1`,
           [inst.id]

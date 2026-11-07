@@ -63,6 +63,8 @@ export function InternalReceivablesTable({
         if (r.isCustomerVisible) return false;
       } else if (statusFilter === "credit") {
         if (!r.isCredit) return false;
+      } else if (statusFilter === "missing_from_latest_report") {
+        if (r.paymentStatus !== "missing_from_latest_report" && !r.isMissingFromLatest) return false;
       } else if (statusFilter !== "all" && r.paymentStatus !== statusFilter) {
         return false;
       }
@@ -372,7 +374,7 @@ export function InternalReceivablesTable({
                   </td>
                   <td className="py-2.5 px-3 whitespace-nowrap">
                     <PaymentStatusBadge
-                      status={r.paymentStatus}
+                      status={r.isMissingFromLatest ? "missing_from_latest_report" : r.paymentStatus}
                       isOverdue={r.daysOverdue > 0}
                       isCredit={r.isCredit}
                     />

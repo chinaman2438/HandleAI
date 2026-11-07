@@ -962,7 +962,9 @@ from public.installments i
 join public.policies p on p.id = i.policy_id
 join public.organizations o on o.id = i.organization_id
 join public.policyholders ph on ph.id = p.policyholder_id
-where i.is_customer_visible = true;
+where i.is_customer_visible = true
+  and coalesce(i.is_missing_from_latest, false) = false
+  and i.payment_status != 'missing_from_latest_report';
 
 
 -- >>> 20261105000006_rls.sql

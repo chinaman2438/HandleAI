@@ -754,6 +754,7 @@ export async function syncWorkbookToDatabase(
         await db.query(
           `update public.installments
               set is_missing_from_latest = true,
+                  is_customer_visible = false,
                   missing_since = coalesce(missing_since, $2::date),
                   payment_status = case
                     when payment_status = 'open' then 'missing_from_latest_report'::public.payment_status
