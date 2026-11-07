@@ -301,15 +301,6 @@ export function CustomerInstallmentsTable({
                     Amount <ArrowUpDown className="h-3 w-3" />
                   </button>
                 </th>
-                <th className="py-3 px-3 text-right">
-                  <button
-                    type="button"
-                    onClick={() => toggleSort("outstandingBalanceBrl")}
-                    className="inline-flex items-center gap-1 hover:text-slate-900 cursor-pointer"
-                  >
-                    Balance <ArrowUpDown className="h-3 w-3" />
-                  </button>
-                </th>
                 <th className="py-3 px-3">Orig. Due</th>
                 <th className="py-3 px-3">Ext. Due</th>
                 <th className="py-3 px-3">
@@ -365,9 +356,6 @@ export function CustomerInstallmentsTable({
                   <td className="py-2.5 px-3 text-right tabular-nums text-slate-700 whitespace-nowrap">
                     {formatBrl(r.amountBrl)}
                   </td>
-                  <td className="py-2.5 px-3 text-right tabular-nums font-semibold text-slate-900 whitespace-nowrap">
-                    {r.isCredit ? "Credit" : formatBrl(r.outstandingBalanceBrl)}
-                  </td>
                   <td className="py-2.5 px-3 tabular-nums text-slate-600 whitespace-nowrap">
                     {formatBrDate(r.originalDueDate)}
                   </td>
@@ -422,7 +410,7 @@ export function CustomerInstallmentsTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="py-10 text-center text-xs text-slate-500">
+                  <td colSpan={12} className="py-10 text-center text-xs text-slate-500">
                     No installments match the selected filters.
                   </td>
                 </tr>
