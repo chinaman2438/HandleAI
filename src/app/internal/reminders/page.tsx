@@ -73,7 +73,7 @@ export default async function InternalRemindersPage() {
               <p className="text-[11px] text-slate-500">
                 {settings.isLiveEmailConfigured
                   ? "RESEND_API_KEY is configured. Reminders are dispatched via email and marked 'sent' with sent_at timestamp."
-                  : "No external email API key required for demo. Reminders are stored in public.reminders with status = 'generated' (generated_at set, sent_at = NULL) so demo mode never falsely claims an external email was delivered."}
+                  : "For demo purposes only"}
               </p>
             </div>
 
