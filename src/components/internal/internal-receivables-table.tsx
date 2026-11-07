@@ -289,7 +289,6 @@ export function InternalReceivablesTable({
                 <th className="py-3 px-3 text-right">Outst. Balance</th>
                 <th className="py-3 px-3">Current Due</th>
                 <th className="py-3 px-2 text-center">Days Overdue</th>
-                <th className="py-3 px-2 text-center">Aging Bucket</th>
                 <th className="py-3 px-3">Status</th>
                 <th className="py-3 px-2 text-center">Ext. Count</th>
                 <th className="py-3 px-3">Cancellation Risk</th>
@@ -355,23 +354,6 @@ export function InternalReceivablesTable({
                       <span className="text-slate-400">0</span>
                     )}
                   </td>
-                  <td className="py-2.5 px-2 text-center">
-                    <span
-                      className={`inline-flex rounded px-2 py-0.5 text-[11px] font-semibold ${
-                        r.agingBucket === "90+"
-                          ? "bg-red-100 text-red-800"
-                          : r.agingBucket === "61-89"
-                            ? "bg-orange-100 text-orange-800"
-                            : r.agingBucket === "31-60"
-                              ? "bg-amber-100 text-amber-800"
-                              : r.agingBucket === "1-30"
-                                ? "bg-blue-50 text-blue-700"
-                                : "bg-slate-100 text-slate-600"
-                      }`}
-                    >
-                      {r.agingBucket}
-                    </span>
-                  </td>
                   <td className="py-2.5 px-3 whitespace-nowrap">
                     <PaymentStatusBadge
                       status={r.isMissingFromLatest ? "missing_from_latest_report" : r.paymentStatus}
@@ -406,7 +388,7 @@ export function InternalReceivablesTable({
               ))}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="py-10 text-center text-xs text-slate-500">
+                  <td colSpan={12} className="py-10 text-center text-xs text-slate-500">
                     No installments match the selected filters.
                   </td>
                 </tr>
