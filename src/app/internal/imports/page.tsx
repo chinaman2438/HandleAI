@@ -63,7 +63,7 @@ export default async function InternalImportsPage() {
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
               <p className="font-bold text-slate-900">1. Header & Footer Auto-Detection</p>
               <p className="mt-0.5 text-slate-600">
-                Automatically locates the true header row (Row 4 in the reference sheet), extracts the snapshot date from Row 2, and skips blank or <code>TOTAL</code> summary rows (Rows 1457–1458).
+                Automatically locates the true header row, extracts the snapshot date from Row 2, and skips blank or <code>TOTAL</code> summary rows.
               </p>
             </div>
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
