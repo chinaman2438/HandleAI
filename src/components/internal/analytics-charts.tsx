@@ -64,7 +64,7 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
               />
               <Tooltip
                 formatter={(value, name) =>
-                  name === "Overdue Balance (BRL)"
+                  name === "Overdue Balance"
                     ? formatBrl(Number(value))
                     : `${value} installments`
                 }
@@ -74,7 +74,7 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
                 yAxisId="brl"
                 type="monotone"
                 dataKey="overdueBrl"
-                name="Overdue Balance (BRL)"
+                name="Overdue Balance"
                 stroke="#dc2626"
                 strokeWidth={2.5}
                 dot={{ r: 4 }}
@@ -114,19 +114,19 @@ export function AnalyticsCharts({ data }: { data: WeekOverWeekAnalytics }) {
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar
                 dataKey="newlyOverdueBrl"
-                name="Newly Overdue (BRL)"
+                name="Newly Overdue"
                 fill="#ef4444"
                 radius={[4, 4, 0, 0]}
               />
               <Bar
                 dataKey="resolvedPaidBrl"
-                name="Resolved via Payment (BRL)"
+                name="Resolved via Payment"
                 fill="#10b981"
                 radius={[4, 4, 0, 0]}
               />
               <Bar
                 dataKey="improvedByExtBrl"
-                name="Moved Future via Extension (BRL)"
+                name="Moved Future via Extension"
                 fill="#f59e0b"
                 radius={[4, 4, 0, 0]}
               />
