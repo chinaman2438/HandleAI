@@ -48,7 +48,7 @@ export default async function CustomerDashboardPage() {
             href="/installments?view=all"
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3.5 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
           >
-            View All Installments (incl. 30+ days out)
+            View All Installments
             <ArrowUpRight className="h-3.5 w-3.5" />
           </Link>
           <Link
