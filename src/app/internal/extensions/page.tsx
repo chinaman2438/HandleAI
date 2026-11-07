@@ -239,7 +239,7 @@ export default async function InternalExtensionsPage() {
                   </td>
                   <td className="py-2.5 px-3 text-slate-700">{r.insurer}</td>
                   <td className="py-2.5 px-2 text-center font-semibold">
-                    #{r.attemptNumber} of {r.totalAttempts}
+                    {r.attemptNumber} of {r.totalAttempts}
                     {r.totalAttempts >= 2 && (
                       <span className="ml-1 text-amber-600" title="2+ attempts">
                         ⚠
