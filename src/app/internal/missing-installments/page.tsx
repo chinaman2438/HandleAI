@@ -1,14 +1,13 @@
 import { CheckCircle2, EyeOff, Wrench } from "lucide-react";
 import { requireStaffUser } from "@/lib/auth/session";
 import { getInternalMissingInstallmentsData } from "@/lib/data/internal-queries";
-import { formatBrl } from "@/lib/format";
 import { MissingInstallmentsList } from "@/components/internal/missing-installments-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function InternalMissingInstallmentsPage() {
   const user = await requireStaffUser();
-  const { missingInstallments, totalMissingBrl, resolvedCount } =
+  const { missingInstallments, resolvedCount } =
     await getInternalMissingInstallmentsData(user);
 
   return (
@@ -25,34 +24,28 @@ export default async function InternalMissingInstallmentsPage() {
       </div>
 
       {/* Summary KPIs */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <div className="rounded-xl border border-rose-200 bg-rose-50/60 p-4 shadow-xs">
-          <div className="flex items-center justify-between">
+      <div className="flex flex-wrap gap-3">
+        <div className="rounded-xl border border-rose-200 bg-rose-50/60 px-4 py-3 shadow-xs min-w-[220px]">
+          <div className="flex items-center justify-between gap-4">
             <span className="text-xs font-bold uppercase tracking-wider text-rose-800">
-              Missing Installments (Overdue)
+              Missing Installments
             </span>
-            <EyeOff className="h-4 w-4 text-rose-600" />
+            <EyeOff className="h-4 w-4 text-rose-600 shrink-0" />
           </div>
-          <p className="mt-2 text-2xl font-bold text-rose-950">
+          <p className="mt-1.5 text-xl font-bold text-rose-950">
             {missingInstallments.length} installments
-          </p>
-          <p className="mt-0.5 text-xs font-medium text-rose-800/80 tabular-nums">
-            {formatBrl(totalMissingBrl)} overdue balance awaiting resolution
           </p>
         </div>
 
-        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 p-4 shadow-xs">
-          <div className="flex items-center justify-between">
+        <div className="rounded-xl border border-emerald-200 bg-emerald-50/60 px-4 py-3 shadow-xs min-w-[180px]">
+          <div className="flex items-center justify-between gap-4">
             <span className="text-xs font-bold uppercase tracking-wider text-emerald-800">
               Resolved
             </span>
-            <CheckCircle2 className="h-4 w-4 text-emerald-600" />
+            <CheckCircle2 className="h-4 w-4 text-emerald-600 shrink-0" />
           </div>
-          <p className="mt-2 text-2xl font-bold text-emerald-950">
+          <p className="mt-1.5 text-xl font-bold text-emerald-950">
             {resolvedCount}
-          </p>
-          <p className="mt-0.5 text-xs font-medium text-emerald-800/80">
-            Reviewed &amp; updated by Meridian staff
           </p>
         </div>
       </div>
