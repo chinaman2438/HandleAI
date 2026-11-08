@@ -1611,6 +1611,40 @@ export async function getInternalImportsAndDq(staffUser: SessionUser) {
   });
 }
 
+export async function getInternalMissingInstallmentsData(staffUser: SessionUser) {
+  const [receivables, resolvedCount] = await Promise.all([
+    getInternalReceivablesList(staffUser),
+    withRlsSession(staffUser.id, async (tx) => {
+      const res = await tx.query<{ cnt: string }>(`
+        select count(*)::text as cnt
+        from public.installments
+        where missing_since is not null
+          and is_missing_from_latest = false
+      `);
+      return Number(res.rows[0]?.cnt ?? 0);
+    }),
+  ]);
+
+  const missingInstallments = receivables
+    .filter(
+      (r) =>
+        (r.isMissingFromLatest || r.paymentStatus === "missing_from_latest_report") &&
+        r.daysOverdue > 0
+    )
+    .sort((a, b) => b.daysOverdue - a.daysOverdue);
+
+  const totalMissingBrl = missingInstallments.reduce(
+    (sum, r) => sum + r.outstandingBalanceBrl,
+    0
+  );
+
+  return {
+    missingInstallments,
+    totalMissingBrl,
+    resolvedCount,
+  };
+}
+
 export async function getInternalCustomersAndUsers(staffUser: SessionUser) {
   return withRlsSession(staffUser.id, async (tx) => {
     const orgsRes = await tx.query<{

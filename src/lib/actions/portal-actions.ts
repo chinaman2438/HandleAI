@@ -1306,6 +1306,164 @@ export async function resolveDataQualityIssueAction(formData: FormData) {
   }
 }
 
+const ResolveMissingInstallmentSchema = z.object({
+  installmentId: z.string().uuid(),
+  resolutionAction: z.enum([
+    "return_open",
+    "paid_keep_hidden",
+    "return_cancelled",
+  ]),
+  resolutionNotes: z.string().max(2000).optional(),
+});
+
+export async function resolveMissingInstallmentAction(formData: FormData) {
+  const staff = await requireStaffUser();
+
+  const rawNotes = String(formData.get("resolutionNotes") ?? "").trim();
+  const parsed = ResolveMissingInstallmentSchema.safeParse({
+    installmentId: formData.get("installmentId"),
+    resolutionAction: formData.get("resolutionAction"),
+    resolutionNotes: rawNotes || undefined,
+  });
+
+  if (!parsed.success) {
+    throw new Error(parsed.error.issues.map((i) => i.message).join("; "));
+  }
+
+  const db = await getServiceDb();
+  const instRes = await db.query<{
+    id: string;
+    policy_id: string;
+    organization_id: string;
+  }>(
+    `select id, policy_id, organization_id from public.installments where id = $1 limit 1`,
+    [parsed.data.installmentId]
+  );
+  const inst = instRes.rows[0];
+  if (!inst) {
+    throw new Error("Installment not found.");
+  }
+
+  const noteSummary =
+    parsed.data.resolutionNotes ||
+    (parsed.data.resolutionAction === "return_open"
+      ? "Returned to report as Open (visible to customer)."
+      : parsed.data.resolutionAction === "paid_keep_hidden"
+        ? "Confirmed Paid & kept hidden from customer report."
+        : "Returned to report as Cancelled (visible to customer).");
+
+  if (parsed.data.resolutionAction === "return_open") {
+    await db.query(
+      `update public.installments
+          set payment_status = 'open',
+              source_status = 'open',
+              is_missing_from_latest = false,
+              is_customer_visible = true,
+              missing_since = coalesce(missing_since, current_date),
+              updated_at = now()
+        where id = $1`,
+      [inst.id]
+    );
+  } else if (parsed.data.resolutionAction === "paid_keep_hidden") {
+    await db.query(
+      `update public.installments
+          set payment_status = 'paid',
+              source_status = 'paid',
+              paid_source = 'investigation',
+              confirmed_paid_brl = greatest(confirmed_paid_brl, amount_brl),
+              outstanding_balance_brl = 0,
+              is_missing_from_latest = false,
+              is_customer_visible = false,
+              missing_since = coalesce(missing_since, current_date),
+              updated_at = now()
+        where id = $1`,
+      [inst.id]
+    );
+  } else if (parsed.data.resolutionAction === "return_cancelled") {
+    await db.query(
+      `update public.installments
+          set payment_status = 'cancelled',
+              source_status = 'cancelled',
+              cancellation_source = 'Employee investigation',
+              cancellation_reason = $2,
+              cancelled_at = now(),
+              is_missing_from_latest = false,
+              is_customer_visible = true,
+              missing_since = coalesce(missing_since, current_date),
+              updated_at = now()
+        where id = $1`,
+      [inst.id, noteSummary]
+    );
+  }
+
+  await db.query(
+    `update public.data_quality_issues
+        set status = 'resolved'::public.dq_status,
+            resolution_notes = $2,
+            resolved_by = $3,
+            resolved_at = now(),
+            updated_at = now()
+      where installment_id = $1
+        and status = 'open'
+        and issue_code in ('missing_overdue_from_report', 'missing_from_latest_report')`,
+    [inst.id, noteSummary, staff.id]
+  );
+
+  await db.query(
+    `insert into public.activity_logs (
+      actor_id, actor_label, organization_id, installment_id,
+      entity_type, entity_id, action, visibility, description
+    ) values ($1, $2, $3, $4, 'installment', $4, 'missing_installment_resolved', 'internal', $5)`,
+    [
+      staff.id,
+      staff.fullName,
+      inst.organization_id,
+      inst.id,
+      `Missing installment resolved (${parsed.data.resolutionAction}): ${noteSummary}`,
+    ]
+  );
+
+  const admin = await getRemoteSupabaseClient();
+  if (admin) {
+    try {
+      const nowIso = new Date().toISOString();
+      const updatedInstRes = await db.query<Record<string, unknown>>(
+        `select * from public.installments where id = $1`,
+        [inst.id]
+      );
+      const iRow = updatedInstRes.rows[0];
+      if (iRow) {
+        const { is_credit: _omit1, import_row_id: _omit2, ...cleanedInst } = iRow;
+        const { error: instErr } = await admin.from("installments").upsert(
+          {
+            ...cleanedInst,
+            updated_at: nowIso,
+          },
+          { onConflict: "id" }
+        );
+        if (instErr) {
+          console.warn(
+            "[portal-actions] Supabase missing installment upsert warning:",
+            instErr.message
+          );
+        }
+      }
+    } catch (err) {
+      console.warn("[portal-actions] Direct Supabase missing installment update warning:", err);
+    }
+  }
+
+  resetDeltaSyncThrottle();
+
+  revalidatePath("/dashboard");
+  revalidatePath("/installments");
+  revalidatePath("/internal/dashboard");
+  revalidatePath("/internal/receivables");
+  revalidatePath("/internal/missing-installments");
+  revalidatePath("/internal/data-quality");
+  revalidatePath(`/internal/installments/${inst.id}`);
+}
+
 export async function uploadExcelSpreadsheetAction(formData: FormData) {
   const staff = await requireStaffUser();
   const file = formData.get("excelFile") as File | null;
