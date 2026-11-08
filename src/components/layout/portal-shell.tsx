@@ -67,7 +67,6 @@ const INTERNAL_NAV: NavItem[] = [
   { href: "/internal/data-quality", label: "Data-Quality Queue", icon: ShieldAlert },
   { href: "/internal/missing-installments", label: "Missing Installments", icon: FileSearch },
   { href: "/internal/reminders", label: "Payment Reminders", icon: Bell },
-  { href: "/internal/customers", label: "Customer Groups & Access", icon: Building2 },
 ];
 
 export function PortalShell({
